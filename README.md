@@ -1,7 +1,7 @@
 This repository contains a few folders I created that contain theorems about topology using the Lean 4 theoremprover. The only important folder is `topology.lean`. Nothing here depends on any external lean libraries (including mathlib), only the lean prelude that comes when you download lean.
 
 I currently have:
-- A definition of a topology on on a set, represented as a type `X` with a "predicate of predicates" `Topology.is_open (τ: Topology X): (X → Prop) → Prop` that return whether the set is open.
+- A definition of a topology on on a set, represented as a type `X` with a "predicate of predicates" `Topology.is_open (τ: Topology X): (X → Prop) → Prop` that return whether a given predicate is corresponds to an open set.
 - Definitions of discrete, indiscrete, and empty set topologies
 - A basis of a topology
 - The interior of a set
