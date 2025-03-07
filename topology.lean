@@ -70,6 +70,9 @@ def empty_topology: Topology Empty := Topology.mk
 @[simp]
 def Topology.is_closed {X: Type} (τ: Topology X) (U: X → Prop): Prop := τ.is_open fun x => ¬U x
 
+
+-- A point x is in the interior of a set A when there exists an open neighborhood
+-- Uₓ of x that is a subset of A.
 def Topology.interior {X: Type} (τ: Topology X) (A: X → Prop): X → Prop := fun x =>
   ∃Uₓ: X → Prop, τ.is_open Uₓ ∧ Uₓ x ∧ (∀y: X, Uₓ y → A y)
 
@@ -77,8 +80,6 @@ theorem Topology.interior_is_open {X: Type} (τ: Topology X) (A: X → Prop):
 τ.is_open (τ.interior A) := by
   apply τ.open_cover_subsets_imp_open
   intro x h
-  -- Theres probably a better way to recursively unpack big and
-  -- statements but i don't know it rn
   cases h;  case a.intro Uₓ rest =>
   cases rest; case intro Uₓ_open rest =>
   cases rest; case intro x_in_Uₓ Uₓ_subset_A =>
@@ -531,3 +532,62 @@ theorem exam_problem_5 {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X
     change (f ∘ f_inv) y₂ = y₂
     rw [cond.left]
     rfl
+
+
+
+theorem interior_subset_closure {X: Type} (τ: Topology X) (A: X → Prop):
+  ∀x, τ.interior A x → τ.closure A x := by
+    intro x x_in_interior
+    apply τ.closure_superset
+    exact τ.interior_subset A x x_in_interior
+
+
+def Topology.boundary {X: Type} (τ: Topology X) (A: X → Prop): X → Prop :=
+  fun x => ∀U: X→ Prop, τ.is_open U → U x → (∃i, U i ∧ A i) ∧ (∃o, U o ∧ ¬A o)
+
+def boundary_empty_set_empty {X: Type} (τ: Topology X):
+  τ.boundary (fun _ => False) = fun _ => False := by
+    funext x
+    apply Eq.propIntro
+    -- ⊆
+    intro x_in_boundary
+    simp [Topology.boundary] at x_in_boundary
+    apply x_in_boundary (fun _ => True)
+    exact τ.whole_set_open
+    trivial
+    --⊇
+    exact False.elim
+
+
+def boundary_whole_set_empty {X: Type} (τ: Topology X):
+  τ.boundary (fun _ => True) = fun _ => False := by
+    funext x
+    apply Eq.propIntro
+    intro x_in_boundary
+    simp [Topology.boundary] at x_in_boundary
+    apply x_in_boundary (fun _ => True)
+    exact τ.whole_set_open
+    trivial
+    exact False.elim
+
+def boundary_interior_disjoint {X: Type} (τ: Topology X) (A: X → Prop):
+  ∀x, ¬(τ.interior A x ∧ τ.boundary A x) := by
+    intro x h
+    cases h; case intro h_int h_bound =>
+    have exists_outside := (h_bound (τ.interior A)
+        (τ.interior_is_open A)
+        h_int).right
+    exact exists_outside.choose_spec.right (τ.interior_subset A
+      exists_outside.choose
+      exists_outside.choose_spec.left)
+
+def boundary_subset_closure {X: Type} (τ: Topology X) (A: X → Prop):
+  ∀x, τ.boundary A x → τ.closure A x := by
+    intro x x_boundary
+    intro S S_closed S_superset
+    apply Classical.byContradiction
+    intro x_not_in_S
+    have := (x_boundary (fun x => ¬S x) S_closed x_not_in_S).left
+    apply this.choose_spec.left
+    apply S_superset
+    exact this.choose_spec.right
