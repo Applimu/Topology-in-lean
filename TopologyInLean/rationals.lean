@@ -21,6 +21,8 @@ instance : Setoid PreRational where
       rw [Int.mul_right_comm z.num, ← h₂, Int.mul_right_comm]
     )
 
+
+
 def Rational := Quotient instSetoidPreRational
 
 def Rational.mk (num den: Int) (h: den ≠ 0): Rational :=
