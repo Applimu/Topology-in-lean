@@ -32,7 +32,7 @@ def discrete_topology (X: Type): Topology X :=
     trivial
   )
 
--- Fridays 2-4 !!
+-- Fridays 2:30-4 !!
 
 def indiscrete_topology (X: Type): Topology X :=
   Topology.mk (is_open := fun U =>
@@ -67,6 +67,8 @@ def empty_topology: Topology Empty := Topology.mk
     trivial
   )
 
+def point_topology: Topology Unit := discrete_topology Unit
+
 @[simp]
 def Topology.is_closed {X: Type} (τ: Topology X) (U: X → Prop): Prop := τ.is_open fun x => ¬U x
 
@@ -80,9 +82,7 @@ theorem Topology.interior_is_open {X: Type} (τ: Topology X) (A: X → Prop):
 τ.is_open (τ.interior A) := by
   apply τ.open_cover_subsets_imp_open
   intro x h
-  cases h;  case a.intro Uₓ rest =>
-  cases rest; case intro Uₓ_open rest =>
-  cases rest; case intro x_in_Uₓ Uₓ_subset_A =>
+  rcases h with ⟨Uₓ, Uₓ_open, x_in_Uₓ, Uₓ_subset_A⟩
   exists Uₓ
   refine And.intro Uₓ_open ?_
   refine And.intro x_in_Uₓ ?_
@@ -93,7 +93,7 @@ def Topology.interior_subset {X: Type} (τ: Topology X) (A: X → Prop): ∀x, �
   intro x h
   refine h.choose_spec.right.right x h.choose_spec.right.left
 
-theorem Topology.interior_mt_set_eq_mt_set {X: Type} (τ: Topology X):
+theorem Topology.interior_emptt_set_eq_empty_set {X: Type} (τ: Topology X):
   τ.interior (fun _ => False) = (fun _ => False) := by
   funext x
   refine eq_false ?_
@@ -109,8 +109,6 @@ theorem Topology.interior_whole_set_eq_whole_set {X: Type} (τ: Topology X):
   exact True.intro
   intro _ _
   exact True.intro
-
-
 
 structure Topology.Basis {X: Type} (τ: Topology X) where
   is_basis_set: (X → Prop) → Prop
@@ -151,32 +149,28 @@ def Topology.from_basis_sets {X: Type} (is_basis_set: (X → Prop) → Prop)
     intro U U_open V V_open x x_in_U x_in_V
     have ⟨basis₁, basis₂⟩ := And.intro (U_open x x_in_U) (V_open x x_in_V)
     clear U_open V_open basis_cover
-    have  := basis_intersection basis₁.choose (basis₁.choose_spec.left)
-                                     basis₂.choose (basis₂.choose_spec.left)
-                                     x (basis₁.choose_spec.right.left)
-                                     (basis₂.choose_spec.right.left)
-    exists this.choose
-    refine And.intro ?_ (And.intro ?_ ?_)
-    exact this.choose_spec.left
-    exact this.choose_spec.right.left
+    rcases basis_intersection basis₁.choose (basis₁.choose_spec.left)
+                      basis₂.choose (basis₂.choose_spec.left)
+                      x (basis₁.choose_spec.right.left)
+                      (basis₂.choose_spec.right.left) with ⟨B, B_basis, x_in_B, B_subset⟩
+    exists B
+    refine And.intro B_basis (And.intro x_in_B ?_)
     intro y By
-    have := this.choose_spec.right.right y By
+    have := B_subset y By
     refine And.intro ?_ ?_
     exact basis₁.choose_spec.right.right y this.left
     exact basis₂.choose_spec.right.right y this.right
   ) (open_cover_subsets_imp_open := by
     intro U property x x_in_U
-    have propertwo := property x x_in_U
-    clear property
-    have x_in_Uₓ := propertwo.choose_spec.right.left
-    exists (propertwo.choose_spec.left x x_in_Uₓ).choose
+    rcases property x x_in_U with ⟨Uₓ, conds, x_in_Uₓ, Uₓ_subset⟩
+    exists (conds x x_in_Uₓ).choose
     constructor
-    refine (propertwo.choose_spec.left x x_in_Uₓ).choose_spec.left
+    refine (conds x x_in_Uₓ).choose_spec.left
     constructor
-    exact (propertwo.choose_spec.left x x_in_Uₓ).choose_spec.right.left
+    exact (conds x x_in_Uₓ).choose_spec.right.left
     intro y h
-    refine propertwo.choose_spec.right.right y ?_
-    exact (propertwo.choose_spec.left x x_in_Uₓ).choose_spec.right.right y h
+    refine Uₓ_subset y ?_
+    exact (conds x x_in_Uₓ).choose_spec.right.right y h
   )
 
 
@@ -291,8 +285,13 @@ def fun_discrete_continuous {X Y: Type} (τ₂: Topology Y) (f: X → Y):
     intro U _
     trivial
 
-def quotient_topology {X Y: Type} (τ: Topology X) (f: X → Y):
+
+-- Note: I renamed this from quotient topology because
+-- Its not exactly the same. Im not entirely sure what to call it
+-- but according to wikipedia final topology is a nice option.
+def final_topology {X Y: Type} (τ: Topology X) (f: X → Y):
   Topology Y := Topology.mk (
+    -- A set is open in Y if it's preimage is open in X
     is_open := fun U => τ.is_open (U ∘ f)
   ) (
     whole_set_open := by
@@ -317,8 +316,8 @@ def quotient_topology {X Y: Type} (τ: Topology X) (f: X → Y):
     exact cond.choose_spec.right.right (f x') yea
   )
 
-theorem quotient_map_continuous {X Y: Type} (τ: Topology X) (f: X → Y):
-  continuous τ (quotient_topology τ f) f := by
+theorem final_map_continuous {X Y: Type} (τ: Topology X) (f: X → Y):
+  continuous τ (final_topology τ f) f := by
     intro U U_open
     exact U_open
 
@@ -377,7 +376,6 @@ theorem topologies_equal_of_same_open_sets {X: Type} (τ₁ τ₂: Topology X)
 theorem topologies_equal_of_same_closed_sets {X: Type} (τ₁ τ₂: Topology X)
   (heq: τ₁.is_closed = τ₂.is_closed): τ₁ = τ₂ := by
   apply topologies_equal_of_same_open_sets
-  unfold Topology.is_closed at *
   funext U
   have := funext_iff.mp heq (fun x => ¬U x)
   simp at this
@@ -453,8 +451,7 @@ theorem exam_problem_3 {X: Type} (τ: Topology X) (h: ∀U: X→ Prop, ∀x, τ.
   funext S
   apply Eq.propIntro
   intro S_closed
-  unfold indiscrete_topology
-  simp
+  simp [indiscrete_topology]
   intro x₁ x₁_not_in_S x₂ _
   apply x₁_not_in_S
   rw [(τ.closure_closed_eq_self S).mp S_closed]
@@ -465,8 +462,7 @@ theorem exam_problem_3 {X: Type} (τ: Topology X) (h: ∀U: X→ Prop, ∀x, τ.
     have : S = fun _ => True := by
       funext x
       apply eq_true
-      unfold indiscrete_topology at h₂
-      simp at h₂
+      simp [indiscrete_topology] at h₂
       apply Classical.not_not.mp
       intro x_not_in_S
       exact h₂ x x_not_in_S non_empty.choose non_empty.choose_spec
@@ -498,37 +494,37 @@ theorem exam_problem_5 {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X
   (homeomorphic: homeomorphism τ₁ τ₂ f) (h: homogeneous τ₁): homogeneous τ₂ := by
   intro y₁ y₂
   cases homeomorphic; case intro f_inv cond =>
-  replace h := h (f_inv y₁) (f_inv y₂)
-  exists f ∘ h.choose ∘ f_inv
+  rcases h (f_inv y₁) (f_inv y₂) with ⟨e, e_homeo, e_inv⟩
+  exists f ∘ e ∘ f_inv
   constructor
-  exists f ∘ h.choose_spec.left.choose ∘ f_inv
+  exists f ∘ e_homeo.choose ∘ f_inv
   constructor
-  · change f ∘ h.choose ∘ (f_inv ∘ f) ∘ h.choose_spec.left.choose ∘ f_inv = id
+  · change f ∘ e ∘ (f_inv ∘ f) ∘ e_homeo.choose ∘ f_inv = id
     rw [cond.right.left]
-    change f ∘ (h.choose ∘ h.choose_spec.left.choose) ∘ f_inv = id
-    rw [h.choose_spec.left.choose_spec.left]
+    change f ∘ (e ∘ e_homeo.choose) ∘ f_inv = id
+    rw [e_homeo.choose_spec.left]
     change f ∘ f_inv = id
     exact cond.left
   constructor
-  · change f ∘ h.choose_spec.left.choose ∘ (f_inv ∘ f) ∘ h.choose ∘ f_inv = id
+  · change f ∘ e_homeo.choose ∘ (f_inv ∘ f) ∘ e ∘ f_inv = id
     rw [cond.right.left]
-    change f ∘ (h.choose_spec.left.choose ∘ h.choose) ∘ f_inv = id
-    rw [h.choose_spec.left.choose_spec.right.left]
+    change f ∘ (e_homeo.choose ∘ e) ∘ f_inv = id
+    rw [e_homeo.choose_spec.right.left]
     change f ∘ f_inv = id
     exact cond.left
   constructor
   · refine comp_continuous τ₁ ?_ ?_ ?_ ?_
     refine comp_continuous τ₁ ?_ ?_ ?_ ?_
     exact cond.right.right.right
-    exact h.choose_spec.left.choose_spec.right.right.left
+    exact e_homeo.choose_spec.right.right.left
     exact cond.right.right.left
   · refine comp_continuous τ₁ ?_ ?_ ?_ ?_
     refine comp_continuous τ₁ ?_ ?_ ?_ ?_
     exact cond.right.right.right
-    exact h.choose_spec.left.choose_spec.right.right.right
+    exact e_homeo.choose_spec.right.right.right
     exact cond.right.right.left
-  · change f (h.choose (f_inv y₁)) = y₂
-    rw [h.choose_spec.right]
+  · change f (e (f_inv y₁)) = y₂
+    rw [e_inv]
     change (f ∘ f_inv) y₂ = y₂
     rw [cond.left]
     rfl
@@ -591,3 +587,78 @@ def boundary_subset_closure {X: Type} (τ: Topology X) (A: X → Prop):
     apply this.choose_spec.left
     apply S_superset
     exact this.choose_spec.right
+
+def product_topology {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y): Topology (X × Y) :=
+  Topology.from_basis_sets (
+    fun B => ∃U: X → Prop, τ₁.is_open U ∧
+      ∃V: Y→ Prop, τ₂.is_open V ∧
+        ∀x, ∀y, B ⟨x, y⟩ ↔ (U x ∧ V y)
+  ) (by
+    intro p
+    exists fun _ => True
+    simp
+    exists fun _ => True
+    refine And.intro (τ₁.whole_set_open) ?_
+    exists fun _ => True
+    refine And.intro (τ₂.whole_set_open) ?_
+    intro x y
+    simp
+  ) (by
+    simp
+    intro B₁ B₁_X B₁_X_open B₁_Y B₁_Y_open B₁_cond
+    intro B₂ B₂_X B₂_X_open B₂_Y B₂_Y_open B₂_cond
+    intro x y xy_in_B₁ xy_in_B₂
+    let B_int := fun pair => B₁ pair ∧ B₂ pair
+    let B_X_int := fun x => B₁_X x ∧ B₂_X x
+    let B_Y_int := fun y => B₁_Y y ∧ B₂_Y y
+
+    exists B_int
+    simp [*]
+    constructor
+
+    exists B_X_int
+    constructor
+    exact τ₁.intersection_open _ B₁_X_open _ B₂_X_open
+    exists B_Y_int
+    constructor
+    exact τ₂.intersection_open _ B₁_Y_open _ B₂_Y_open
+    · intro px py
+      constructor
+      intro h
+      constructor; constructor
+      exact ((B₁_cond px py).mp (h.left)).left
+      exact ((B₂_cond px py).mp (h.right)).left
+      constructor
+      exact ((B₁_cond px py).mp (h.left)).right
+      exact ((B₂_cond px py).mp (h.right)).right
+      intro h
+      constructor
+      apply (B₁_cond px py).mpr
+      constructor
+      exact h.left.left
+      exact h.right.left
+      apply (B₂_cond px py).mpr
+      constructor
+      exact h.left.right
+      exact h.right.right
+    · constructor
+      constructor
+      assumption
+      assumption
+      intro a b B₁_a B₂_a B₁_b B₂_b
+      constructor
+      exact ⟨B₁_a, B₂_a⟩
+      exact ⟨B₁_b, B₂_b⟩
+  )
+
+
+theorem fst_continuous {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
+  continuous (product_topology τ₁ τ₂) τ₁ Prod.fst := by
+    intro U U_open
+    simp [product_topology, Topology.from_basis_sets]
+    intro a b a_in_U
+    sorry
+
+theorem snd_continuous {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
+  continuous (product_topology τ₁ τ₂) τ₂ Prod.snd := by sorry
+-- n
