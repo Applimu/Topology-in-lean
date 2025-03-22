@@ -568,8 +568,7 @@ def boundary_whole_set_empty {X: Type} (τ: Topology X):
 
 def boundary_interior_disjoint {X: Type} (τ: Topology X) (A: X → Prop):
   ∀x, ¬(τ.interior A x ∧ τ.boundary A x) := by
-    intro x h
-    cases h; case intro h_int h_bound =>
+    rintro x ⟨h_int, h_bound⟩
     have exists_outside := (h_bound (τ.interior A)
         (τ.interior_is_open A)
         h_int).right
@@ -587,6 +586,18 @@ def boundary_subset_closure {X: Type} (τ: Topology X) (A: X → Prop):
     apply this.choose_spec.left
     apply S_superset
     exact this.choose_spec.right
+
+def Topology.open_of_every_point_in {X: Type} (τ: Topology X) (U: X → Prop):
+  (∀x, U x) → τ.is_open U := by
+    intro h
+    have : U = fun _ => True := by
+      funext x
+      apply eq_true
+      exact h x
+    rw [this]
+    exact τ.whole_set_open
+
+#check Topology.intersection_open
 
 def product_topology {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y): Topology (X × Y) :=
   Topology.from_basis_sets (
@@ -609,42 +620,36 @@ def product_topology {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y): Topolo
     intro B₂ B₂_X B₂_X_open B₂_Y B₂_Y_open B₂_cond
     intro x y xy_in_B₁ xy_in_B₂
     let B_int := fun pair => B₁ pair ∧ B₂ pair
-    let B_X_int := fun x => B₁_X x ∧ B₂_X x
-    let B_Y_int := fun y => B₁_Y y ∧ B₂_Y y
 
     exists B_int
     simp [*]
     constructor
 
-    exists B_X_int
+    exists fun x => B₁_X x ∧ B₂_X x
     constructor
     exact τ₁.intersection_open _ B₁_X_open _ B₂_X_open
-    exists B_Y_int
+    exists fun y => B₁_Y y ∧ B₂_Y y
     constructor
     exact τ₂.intersection_open _ B₁_Y_open _ B₂_Y_open
     · intro px py
+      have B₁_iff := B₁_cond px py
+      have B₂_iff := B₂_cond px py
       constructor
-      intro h
+      rintro ⟨B₁_p, B₂_p⟩
       constructor; constructor
-      exact ((B₁_cond px py).mp (h.left)).left
-      exact ((B₂_cond px py).mp (h.right)).left
+      exact (B₁_iff.mp B₁_p).left
+      exact (B₂_iff.mp B₂_p).left
       constructor
-      exact ((B₁_cond px py).mp (h.left)).right
-      exact ((B₂_cond px py).mp (h.right)).right
-      intro h
+      exact (B₁_iff.mp B₁_p).right
+      exact (B₂_iff.mp B₂_p).right
+      rintro ⟨⟨a,b⟩,⟨c,d⟩⟩
       constructor
-      apply (B₁_cond px py).mpr
-      constructor
-      exact h.left.left
-      exact h.right.left
-      apply (B₂_cond px py).mpr
-      constructor
-      exact h.left.right
-      exact h.right.right
+      apply B₁_iff.mpr
+      constructor; assumption; assumption
+      apply B₂_iff.mpr
+      constructor; assumption; assumption
     · constructor
-      constructor
-      assumption
-      assumption
+      constructor; assumption; assumption
       intro a b B₁_a B₂_a B₁_b B₂_b
       constructor
       exact ⟨B₁_a, B₂_a⟩
@@ -657,8 +662,52 @@ theorem fst_continuous {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
     intro U U_open
     simp [product_topology, Topology.from_basis_sets]
     intro a b a_in_U
-    sorry
+    exists (fun (x,_) => U x)
+    simp
+    refine And.intro ?_ a_in_U
+    exists U
+    refine And.intro U_open ?_
+    exists (fun _ => True)
+    refine And.intro (τ₂.whole_set_open) ?_
+    simp
+
+
 
 theorem snd_continuous {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
-  continuous (product_topology τ₁ τ₂) τ₂ Prod.snd := by sorry
--- n
+  continuous (product_topology τ₁ τ₂) τ₂ Prod.snd := by
+    intro V V_open
+    simp [product_topology, Topology.from_basis_sets]
+    intro a b b_in_V
+    exists (fun (_,y)=> V y)
+    simp
+    refine ⟨?_, b_in_V⟩
+    exists (fun _ => True)
+    refine ⟨τ₁.whole_set_open, ?_⟩
+    exists V
+    refine ⟨V_open, ?_⟩
+    simp
+
+
+theorem diagonal_closed_of_hausdorff {X: Type} (τ: Topology X) (h: τ.hausdorff):
+  (product_topology τ τ).is_closed (fun p => p.fst = p.snd) := by
+    simp only [product_topology, Topology.from_basis_sets, Topology.is_closed]
+    rintro ⟨a,b⟩ hne; simp at hne
+    replace h := hne ∘ h a b; simp at h
+    exists fun (x,y) => h.choose x ∧ h.choose_spec.right.right.choose y
+    constructor
+    exists h.choose
+    constructor; exact h.choose_spec.left
+    exists h.choose_spec.right.right.choose
+    constructor; exact h.choose_spec.right.right.choose_spec.left
+    intro x y
+    apply Iff.intro
+    intro xy_in_B; assumption
+    rintro ⟨Ux, Vy⟩;
+    exact ⟨Ux, Vy⟩
+    simp
+    constructor
+    exact ⟨h.choose_spec.right.left, h.choose_spec.right.right.choose_spec.right.left⟩
+    intro x y Ux Uy heq
+    cases heq; case refl =>
+    apply h.choose_spec.right.right.choose_spec.right.right x
+    assumption; assumption

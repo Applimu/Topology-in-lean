@@ -10,6 +10,7 @@ I currently have:
 - continuous functions
 - closure of sets
 - A few proofs of problems in a recent topology exam in topology
+- Product spaces
 
 
 `Cofinite_failure.lean` contains some attempts that I made in defining cofinite predicates. 
