@@ -1,0 +1,14 @@
+{"log":
+ [{"message":
+   ".> LEAN_PATH=.\\.\\.lake\\build\\lib PATH c:\\Users\\nilsp\\.elan\\toolchains\\stable\\bin\\lean.exe .\\.\\.\\.\\TopologyInLean\\topology.lean -R .\\.\\.\\. -o .\\.\\.lake\\build\\lib\\TopologyInLean\\topology.olean -i .\\.\\.lake\\build\\lib\\TopologyInLean\\topology.ilean -c .\\.\\.lake\\build\\ir\\TopologyInLean\\topology.c --json",
+   "level": "trace"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\topology.lean:398:4: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\topology.lean:655:8: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\topology.lean:662:8: declaration uses 'sorry'",
+   "level": "warning"}],
+ "depHash": "2388573595232568075"}

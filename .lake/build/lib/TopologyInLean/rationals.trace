@@ -1,0 +1,20 @@
+{"log":
+ [{"message":
+   ".> LEAN_PATH=.\\.\\.lake\\build\\lib PATH c:\\Users\\nilsp\\.elan\\toolchains\\stable\\bin\\lean.exe .\\.\\.\\.\\TopologyInLean\\rationals.lean -R .\\.\\.\\. -o .\\.\\.lake\\build\\lib\\TopologyInLean\\rationals.olean -i .\\.\\.lake\\build\\lib\\TopologyInLean\\rationals.ilean -c .\\.\\.lake\\build\\ir\\TopologyInLean\\rationals.c --json",
+   "level": "trace"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\rationals.lean:39:0: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\rationals.lean:75:0: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\rationals.lean:75:0: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\rationals.lean:95:8: declaration uses 'sorry'",
+   "level": "warning"},
+  {"message":
+   ".\\.\\.\\.\\TopologyInLean\\rationals.lean:102:0: 3 /// 5 : 5 ≠ 0 → Rational",
+   "level": "info"}],
+ "depHash": "215088050772396621"}
