@@ -19,18 +19,15 @@ theorem Topology.empty_set_open {X: Type} (τ: Topology X): τ.is_open (fun _ =>
   intro x
   exact False.elim
 
-def discrete_topology (X: Type): Topology X :=
-  Topology.mk (is_open :=
-    fun _ => True
-  ) (whole_set_open := by
-    trivial
-  ) (intersection_open := by
-    intro _ _ _ _
-    trivial
-  ) (open_cover_subsets_imp_open := by
-    intro _ _
-    trivial
-  )
+theorem Topology.open_of_eq_open_set {X: Type} (τ: Topology X) (U₁: X → Prop) {U₂: X → Prop}
+  (heq: ∀x, U₁ x ↔ U₂ x) (U₁_open: τ.is_open U₁) : τ.is_open U₂ :=
+    have : U₁ = U₂ := by
+      funext x
+      exact propext (heq x)
+    Eq.subst this U₁_open
+
+def discrete_topology (X: Type): Topology X := Topology.mk (is_open := fun _ => True)
+  (by simp) (by simp) (by simp)
 
 def indiscrete_topology (X: Type): Topology X :=
   Topology.mk (is_open := fun U =>
@@ -55,7 +52,8 @@ def indiscrete_topology (X: Type): Topology X :=
 
 def empty_topology: Topology Empty := Topology.mk
   (is_open := fun _ => True)
-  (whole_set_open := by
+  (whole_set_open :=
+  by
     trivial
   ) (intersection_open := by
     intro _ _ _ _
@@ -67,13 +65,51 @@ def empty_topology: Topology Empty := Topology.mk
 
 def point_topology: Topology Unit := discrete_topology Unit
 
+theorem point_topology_eq (τ: Topology Unit): τ = point_topology := by
+  rcases τ with ⟨τ_is_open, p₁, p₂, p₃⟩
+  simp [point_topology, discrete_topology]
+  funext U
+  apply eq_true
+  apply p₃
+  intro x Ux
+  exists fun _ => True
+  refine ⟨p₁, trivial, ?_⟩
+  intro y _
+  rw [Unit.ext y x]
+  assumption
+
+
+def serpinski_space: Topology Bool := {
+  is_open := fun U => U false → U true
+  whole_set_open := by
+    trivial
+  intersection_open := by
+    intro U U_open V V_open
+    simp
+    intro Uf Vf
+    exact ⟨U_open Uf, V_open Vf⟩
+  open_cover_subsets_imp_open := by
+    intro U cond Uf
+    replace cond := cond false Uf
+    rcases cond with ⟨U₂, yea, U₂f, subset⟩
+    apply subset
+    apply yea
+    assumption
+}
+
 @[simp]
 def Topology.is_closed {X: Type} (τ: Topology X) (U: X → Prop): Prop := τ.is_open fun x => ¬U x
 
-structure Topology.open_nbhd {X: Type} (τ: Topology X) (x: X) where
+structure nbhd {X: Type} (is_open: (X → Prop) → Prop) (x: X) where
   in_nbhd: X → Prop
-  nbhd_open: τ.is_open in_nbhd
+  nbhd_open: is_open in_nbhd
   is_nbhd: in_nbhd x
+
+def Topology.open_nbhd {X: Type} (τ: Topology X) (x: X): Type :=
+  nbhd (τ.is_open) x
+
+def Topology.open_nbhd.nbhd_open {X: Type} (τ: Topology X) (x: X)
+ (U: τ.open_nbhd x): τ.is_open U.in_nbhd := nbhd.nbhd_open U
 
 def exists_open_nbhd {X: Type} (τ: Topology X) (x: X): τ.open_nbhd x := ⟨fun _ => True, τ.whole_set_open, trivial⟩
 
@@ -103,24 +139,22 @@ def Topology.interior {X: Type} (τ: Topology X) (A: X → Prop): X → Prop := 
   ∃N: τ.open_nbhd x, ∀y: X, N.in_nbhd y → A y
 
 theorem Topology.open_of_interior_superset {X: Type} (τ: Topology X) (U: X → Prop)
-  (h: ∀x, τ.interior U x): τ.is_open U := by
+  (h: ∀x, U x → τ.interior U x): τ.is_open U := by
     apply τ.open_cover_subsets_imp_open
-    intro x _
-    exists (h x).choose.in_nbhd
-    constructor; exact (h x).choose.nbhd_open
-    constructor; exact (h x).choose.is_nbhd
+    intro x Ux
+    exists (h x Ux).choose.in_nbhd
+    constructor; exact (h x Ux).choose.nbhd_open
+    constructor; exact (h x Ux).choose.is_nbhd
     intro y y_in_nbhd
-    exact (h x).choose_spec y y_in_nbhd
+    exact (h x Ux).choose_spec y y_in_nbhd
 
 
 theorem Topology.interior_is_open {X: Type} (τ: Topology X) (A: X → Prop):
 τ.is_open (τ.interior A) := by
-  apply τ.open_cover_subsets_imp_open
+  apply τ.open_cover_subsets_imp_open'
   intro x h
   rcases h with ⟨⟨Uₓ, Uₓ_open, x_in_Uₓ⟩, Uₓ_subset_A⟩
-  exists Uₓ
-  refine And.intro Uₓ_open ?_
-  refine And.intro x_in_Uₓ ?_
+  exists {in_nbhd := Uₓ, nbhd_open := Uₓ_open, is_nbhd := x_in_Uₓ}
   intro y y_in_Uₓ
   exists ⟨Uₓ, Uₓ_open, y_in_Uₓ⟩
 
@@ -208,7 +242,6 @@ def Topology.from_basis_sets {X: Type} (is_basis_set: (X → Prop) → Prop)
     exact (conds x x_in_Uₓ).choose_spec.right.right y h
   )
 
-
 def Topology.hausdorff {X: Type} (τ: Topology X): Prop :=
   ∀x: X, ∀y: X, (∀U: τ.open_nbhd x, ∀V: τ.open_nbhd y,
     ∃p: X, U.in_nbhd p ∧ V.in_nbhd p) → x = y
@@ -228,15 +261,16 @@ theorem discrete_hausdorff {X: Type}: Topology.hausdorff (discrete_topology X) :
             ⟨(fun p => p = y), trivial, rfl⟩
   exact Eq.trans property.choose_spec.left property.choose_spec.right
 
-theorem hausdorff_indiscrete_imp_contractible:
-  Topology.hausdorff (indiscrete_topology X) → ∀x: X, ∀y: X, x = y := by
-  intro hausdorff x y
+instance hausdorff_indiscrete_imp_subsingleton:
+  Topology.hausdorff (indiscrete_topology X) → Subsingleton X := by
+  intro hausdorff
+  apply Subsingleton.intro
+  intro x y
   apply hausdorff
   rintro ⟨U, _, x_in_U⟩ ⟨V, V_open, y_in_V⟩
   exists x
   refine And.intro x_in_U ?_
   exact V_open y y_in_V x
-
 
 def Topology.frechet {X: Type} (τ: Topology X) :=
   ∀x: X, τ.is_open (fun y => x ≠ y)
@@ -245,9 +279,11 @@ theorem discrete_frechet {X: Type}: Topology.frechet (discrete_topology X) := by
   intro _
   trivial
 
-theorem indiscrete_frechet_imp_contractible {X: Type}:
-  Topology.frechet (indiscrete_topology X) → ∀x y: X, x = y := by
-  intro frechet x y
+instance indiscrete_frechet_imp_subsingleton {X: Type}:
+  Topology.frechet (indiscrete_topology X) → Subsingleton X := by
+  intro frechet
+  apply Subsingleton.intro
+  intro x y
   apply Classical.byContradiction
   intro hne
   have := (frechet x) y hne x
@@ -325,6 +361,12 @@ def fun_discrete_continuous {X Y: Type} (τ₂: Topology Y) (f: X → Y):
     intro U _
     trivial
 
+def continuous_of_inv_closed_sets_closed {X Y: Type} (τX: Topology X) (τY: Topology Y)
+  (f: X → Y) (h: ∀C: Y → Prop, τY.is_closed C → τX.is_closed (C ∘ f)): continuous τX τY f := by
+  intro U U_open
+  replace h := h (fun x => ¬ U x)
+  simp at *
+  exact h U_open
 
 -- Note: I renamed this from quotient topology because
 -- Its not exactly the same. Im not entirely sure what to call it
@@ -360,8 +402,6 @@ theorem final_map_continuous {X Y: Type} (τ: Topology X) (f: X → Y):
   continuous τ (final_topology τ f) f := by
     intro U U_open
     exact U_open
-
-
 
 -- A point x is in the closure of U iff for every closed set S which is
 -- a superset of U, x is in S
@@ -439,7 +479,6 @@ theorem Topology.empty_set_closed {X: Type} (τ: Topology X) : τ.is_closed (fun
   unfold Topology.is_closed
   simp
   --exact τ.whole_set_open
-
 
 
 def exam_problem_1 {X: Type} (τ: Topology X): Topology (Option X) := Topology.mk
@@ -711,10 +750,7 @@ def product_topology {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y): Topolo
     intro x' yea₁ y' yea₂
     apply subset
     exact (openn x y member).choose_spec.choose_spec x' yea₁ y' yea₂
-
 }
-
-
 
 theorem fst_continuous {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
   continuous (product_topology τ₁ τ₂) τ₁ Prod.fst := by
@@ -749,6 +785,18 @@ theorem diagonal_closed_of_hausdorff {X: Type} (τ: Topology X) (h: τ.hausdorff
   intro x' x'nbhd y' y'nbhd heq
   cases heq
   exact disjoint x' x'nbhd y'nbhd
+
+theorem hausdorff_of_diagonal_closed {X: Type} (τ: Topology X)
+(h: (product_topology τ τ).is_closed (fun p => p.fst = p.snd)): τ.hausdorff := by
+  simp [product_topology] at h
+  intro x y cond
+  apply Classical.byContradiction
+  intro hneq
+  replace h := h x y hneq
+  rcases h with ⟨U,V,h⟩
+  replace cond := cond U V
+  rcases cond with ⟨p, Up, Vp⟩
+  exact h p Up p Vp rfl
 
 def Topology.subspace_topology {X: Type} (τ: Topology X) (pred: X → Prop):
   Topology {x: X // (pred x)} := Topology.mk (
@@ -803,77 +851,153 @@ def Topology.subspace_topology {X: Type} (τ: Topology X) (pred: X → Prop):
         exact what
   )
 
-
--- random doodle here: not related to topology
-theorem idk {X Y: Type} (x y: X) (eq_x_decidable: ∀p, Decidable (x = p))
-  (h: ∀f: X → Y, f x = f y) (hneq: x ≠ y): ∀a:Y, ∀b:Y, a = b := by
-  intro a b
-  let f: X → Y := fun p =>
-    match eq_x_decidable p with
-    | .isTrue _ => a
-    | .isFalse _ => b
-
-  have eqa: f x = a := by
-    simp [f]
-    cases eq_x_decidable x
-    case isFalse nh => contradiction
-    case isTrue h => rfl
-  have eqb: f y = b := by
-    simp [f]
-    cases eq_x_decidable y
-    case isTrue h => exact absurd h hneq
-    case isFalse nh => rfl
-  rw [<- eqa, <- eqb]
-  exact h f
-
--- Defined as to mean that the projection map X × Y → Y is a closed map
+@[simp]
+def subspace_open_nbhd {X: Type} {τ: Topology X} {pred: X → Prop} (x: X) (pred_x: pred x)
+(U: τ.open_nbhd x): ((τ.subspace_topology pred).open_nbhd ⟨x, pred_x⟩) := by
+  constructor
+  case in_nbhd =>
+    exact fun ⟨p, _⟩ => U.in_nbhd p
+  dsimp [Topology.subspace_topology]
+  exists U.in_nbhd
+  constructor
+  exact U.nbhd_open
+  funext ⟨y, _⟩
+  simp
+  exact U.is_nbhd
 
 def Topology.Compact {X: Type} (τ: Topology X): Prop := ∀Y, ∀τ₂: Topology Y,
-  ∀C: X × Y → Prop, (product_topology τ τ₂).is_closed C → τ₂.is_closed (fun y => ∃x, C (x,y))
+  ∀C: X × Y → Prop, (product_topology τ τ₂).is_open C → τ₂.is_open (fun y => ∀x, C (x,y))
 
+#check ∀X, ∀τ: Topology X, ∀Y, ∀τ₂: Topology Y, ∀C: X × Y → Prop,
+  (∀x: X, ∀y: Y, C (x,y) → ∃U: τ.open_nbhd x, ∃V: τ₂.open_nbhd y,
+    ∀x':X, U.in_nbhd x' → ∀y':Y, V.in_nbhd y' → C (x', y'))
+  → τ₂.is_open (fun y => ∀x, C (x,y))
+
+#check ∀X, ∀τ: Topology X, ∀Y, ∀τ₂: Topology Y, ∀C: X × Y → Prop,
+  ∀y₀: Y, (∀x, C (x,y₀)) →
+  (∀x: X, ∀y: Y, C (x,y) → ∃U: τ.open_nbhd x, ∃V: τ₂.open_nbhd y,
+    ∀x':X, U.in_nbhd x' → ∀y':Y, V.in_nbhd y' → C (x', y'))
+  → ∃W: τ₂.open_nbhd y₀, ∀y': Y, W.in_nbhd y' → ∀x': X, C (x', y')
 
 def point_compact (τ: Topology Unit): τ.Compact := by
-  --dsimp [Topology.Compact, product_topology]
   intro Y τ₂ C pC_closed
   apply τ₂.open_cover_subsets_imp_open'
   intro x empty
-  replace empty : ¬C ((), x) := by
-    simp at empty; exact empty ()
+  replace empty : C ((), x) := empty ()
   replace pC_closed := pC_closed () x empty
   rcases pC_closed with ⟨singleton, V, c⟩
   exists V
   replace c := c () singleton.is_nbhd
-  simp [not_exists]
   intro y Vy a
   rw [Unit.ext a ()]
   exact c y Vy
 
-def finite_space_compact {n: Nat} (τ: Topology (Fin n)): τ.Compact := by
-  induction n
-  case zero =>
-    simp [Topology.Compact]
-    intro Y τ₂ C C_closed
-    apply τ₂.open_of_every_point_in
-    intro y dne _
-    rcases dne with ⟨n, yea⟩
-    omega
-  case succ n ih =>
-    intro Y τ₂ C C_closed
-    sorry
+
+theorem image_compact_cont_surj_is_compact {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y)
+  (f_cont: continuous τ₁ τ₂ f) (f_surj: ∀y: Y, ∃x, f x = y) (cpct: τ₁.Compact):  τ₂.Compact := by
+  dsimp [Topology.Compact, product_topology] at *
+  intro Z τZ C C_closed
+  -- we'll use the fact that the image of the projeciton of this set is closed
+  replace cpct := cpct Z τZ (fun (x,y) => C (f x, y))
+  dsimp at cpct
+  apply τZ.open_of_eq_open_set (fun x => ∀ x_1, C (f x_1, x))
+  · intro x
+    constructor
+    intro h y
+    rw [<- (f_surj y).choose_spec]
+    exact h (f_surj y).choose
+    intro h x
+    exact h (f x)
+  apply cpct
+  clear cpct f_surj
+  intro x y nCfxy
+  rcases C_closed (f x) y nCfxy with ⟨U, V, yea⟩
+  clear C_closed
+  exists {
+    in_nbhd := U.in_nbhd ∘ f
+    nbhd_open := by
+      apply f_cont -- Preimage of U is open by continuity!
+      exact U.nbhd_open
+    is_nbhd := U.is_nbhd
+  }
+  exists V
+  intro x' f_invUx' z' Vz'
+  dsimp at f_invUx'
+  exact yea (f x') f_invUx' z' Vz'
+
+theorem tube_lemma {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (Y_cpct: τ₂.Compact)
+  (x₀: X) (U: Y×X→ Prop) (U_open: (product_topology τ₂ τ₁).is_open U) (h: ∀y: Y, U (y, x₀)):
+    ∃W: τ₁.open_nbhd x₀, ∀x, W.in_nbhd x → ∀y, U (y, x) := by
+    exists {
+      in_nbhd := fun y => ∀x, U (x,y),
+      nbhd_open := Y_cpct X τ₁ U U_open,
+      is_nbhd := h
+    }
+    intro x x_in_W y
+    dsimp at x_in_W
+    exact x_in_W y
 
 
+theorem infinite_discrete_set_not_cpct: ¬((discrete_topology Nat).Compact) := by
+  dsimp [discrete_topology, Topology.Compact, product_topology]
+  intro h
+  replace h := h Nat {
+    is_open := fun U => U 0 ∨ ∀x, ¬U x
+    whole_set_open := by left; trivial
+    intersection_open := by
+      intro U U_open V V_open
+      cases U_open
+      case inr h =>
+        right
+        intro x h₂
+        exact h x (h₂.left)
+      case inl h =>
+      cases V_open
+      case inr h =>
+        right
+        intro x h₂
+        exact h x (h₂.right)
+      case inl h₂ =>
+        left
+        exact ⟨h, h₂⟩
+    open_cover_subsets_imp_open := by
+      dsimp
+      intro U cond
+      apply Classical.or_iff_not_imp_right.mpr
+      intro U_nonempty
+      simp only [Classical.not_forall, Classical.not_not] at U_nonempty
+      rcases U_nonempty with ⟨x₀, U_x₀⟩
+      replace cond := cond x₀ U_x₀
+      rcases cond with ⟨Uₓ, mb_mt ,i, k⟩
+      have : Uₓ 0 := by
+        cases mb_mt
+        case inl => assumption
+        case inr h =>
+          exact absurd i (h x₀)
+      exact k 0 this
+  }
 
 
-def eventually (pred: Nat → Prop): Prop := ∃N, ∀n, pred (N + n)
+def cofinite_topology {X: Type}: Topology X := Topology.from_basis_sets (
+    is_basis_set := fun B => ∀x:X, ¬B x → ∀y, B y ∨ x = y
+  ) (basis_cover := by
+    intro x
+    dsimp
+    exists fun _ => True
+    simp
+  ) (basis_intersection := by
+    intro B₁ B₁_basis B₂ B₂_basis x B₁x B₂x
+
+  )
 
 
 def Topology.approaches {X: Type} (τ: Topology X) (sequence: Nat → X) (L: X): Prop :=
-  ∀U: τ.open_nbhd L, eventually (U.in_nbhd ∘ sequence)
+  ∀U: τ.open_nbhd L, ∃N, ∀n, (U.in_nbhd ∘ sequence) (N + n)
 
 theorem unique_limits_of_hausdorff {X: Type} (τ: Topology X) (h: τ.hausdorff)
   (sequence: Nat → X) (L₁ L₂: X) (aL₁: τ.approaches sequence L₁) (aL₂: τ.approaches sequence L₂):
     L₁ = L₂ := by
-  simp [Topology.approaches, eventually, Topology.hausdorff] at *
+  simp [Topology.approaches, Topology.hausdorff] at *
   apply h L₁ L₂
   intro U V
   replace aL₁ := aL₁ U
@@ -901,15 +1025,177 @@ theorem frechet_of_unique_limits {X: Type} (τ: Topology X):
     intro U; exists 0
     simp
     exact U.is_nbhd
-  simp [Topology.approaches, eventually] at const_x_not_approaches_y
+  simp [Topology.approaches] at const_x_not_approaches_y
   exists const_x_not_approaches_y.choose
   intro y₂ h heq
   rw [← heq] at h
   exact const_x_not_approaches_y.choose_spec h
 
 
--- This definition surprisingly does not depend on `Z` to be a topological space
+-- This definition does not directly depend on `Z` being a topological space
 -- So I am leaving that part out!
-def FiberProduct {X Y: Type} (Z: Type) (τ₁: Topology X) (τ₂: Topology Y)
+def fiber_prod_topology {X Y Z: Type} (τ₁: Topology X) (τ₂: Topology Y)
   (f: X → Z) (g: Y → Z): Topology {p: X × Y // f p.1 = g p.2} :=
    (product_topology τ₁ τ₂).subspace_topology (fun p => f p.1 = g p.2)
+
+def continuous_fiber_fst {X Y Z: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Z) (g: Y → Z):
+  continuous (fiber_prod_topology τ₁ τ₂ f g) τ₁ (fun p => p.val.fst) := by
+    intro U U_open
+    simp [fiber_prod_topology, product_topology, Topology.subspace_topology]
+    exists fun p => U p.fst
+    constructor
+    · intro x y x_in_U
+      exists {in_nbhd := U, nbhd_open := U_open, is_nbhd := x_in_U}
+      exists τ₂.whole_set_nbhd y
+      intro x' x'_in_U y' _
+      exact x'_in_U
+    · rfl
+
+def continuous_fiber_snd {X Y Z: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Z) (g: Y → Z):
+  continuous (fiber_prod_topology τ₁ τ₂ f g) τ₂ (fun p => p.val.snd) := by
+    intro U U_open
+    simp [fiber_prod_topology, product_topology, Topology.subspace_topology]
+    exists fun p => U p.snd
+    constructor
+    · intro x y x_in_U
+      exists τ₁.whole_set_nbhd x
+      exists {in_nbhd := U, nbhd_open := U_open, is_nbhd := x_in_U}
+      intro x' _ y' y'_in_U
+      exact y'_in_U
+    · rfl
+
+
+def Topology.image_subspace {X Y: Type} {τ: Topology Y}
+  (f: X → Y): Topology {y: Y // ∃x, y = f x} := --τ₂.subspace_topology (fun y => ∃x, y = f x)
+  {
+    is_open := fun U => ∃Uo: Y → Prop, τ.is_open Uo ∧ U = Uo ∘ Subtype.val,
+    whole_set_open := by
+      exists fun _ => True
+      simp
+      funext y
+      simp
+    intersection_open := by
+      intro U' ⟨U, U_open, heq₁⟩ V' ⟨V, V_open, heq₂⟩
+      cases heq₁
+      cases heq₂
+      exists (fun y => U y ∧ V y)
+      constructor
+      exact τ.intersection_open U U_open V V_open
+      funext ⟨y, hy⟩
+      dsimp
+    open_cover_subsets_imp_open := by
+      intro U cond
+      dsimp at cond
+      exists (fun y => ∃x': X,
+        let y': {y: Y // ∃x, y = f x} := ⟨f x', by exists x'⟩
+        ∃h: U y', (cond y' h).choose_spec.left.choose y
+      )
+      dsimp
+      constructor
+      apply τ.open_cover_subsets_imp_open
+      intro y ⟨x, c, k⟩
+      rcases cond ⟨f x, Exists.intro x rfl⟩ c with ⟨U_,⟨U'', U''_open, heq⟩,U_fx, subset⟩
+      cases heq
+      dsimp at *
+      exists U''
+      constructor; assumption
+      constructor; sorry;
+      intro y' U''y'
+      sorry
+      sorry
+  }
+
+
+def open_map {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y): Prop :=
+  ∀U: X → Prop, τ₁.is_open U → τ₂.is_open (fun y => ∃x, y = f x ∧ U x)
+
+def cts_factor_property {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y)
+  (f_cont: continuous τ₁ τ₂ f) (f_surj: ∀y, ∃x, y = f x):
+    ∀Z: Type, ∀τ₃: Topology Z, ∀k: Y → Z, open_map τ₁ τ₃ (k ∘ f) → open_map τ₂ τ₃ k := by
+  intro Z τ₃ k open_map_kof U U_open
+  have fiU_open: τ₁.is_open (U ∘ f) := f_cont U U_open; clear f_cont U_open
+  have image_open := open_map_kof (U ∘ f) fiU_open
+  refine τ₃.open_of_eq_open_set (fun y => ∃ x, y = (k ∘ f) x ∧ (U ∘ f) x) ?_ image_open
+  intro z
+  simp
+  constructor
+  intro ⟨x, hx, Ufx⟩
+  exists f x
+  intro ⟨y, hy, Uy⟩
+  exists (f_surj y).choose
+  rw [← (f_surj y).choose_spec]
+  exact ⟨hy, Uy⟩
+
+def rel_open_map (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y): Prop :=
+  ∀U: X → Prop, τ₁.is_open U → (τ₂.image_subspace f).is_open (fun ⟨y, hy⟩ => U hy.choose)
+
+
+theorem fst_open_map {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y):
+  open_map (product_topology τ₁ τ₂) τ₁ Prod.fst := by
+  intro U U_open
+  dsimp [product_topology] at *
+  apply τ₁.open_of_eq_open_set (fun y => ∃x, U (y, x))
+  · intro x
+    constructor
+    intro ⟨y, hy⟩
+    exists (x,y)
+    intro ⟨p, hp⟩
+    exists p.snd
+    rw [hp.left]
+    exact hp.right
+  apply τ₁.open_cover_subsets_imp_open'
+  intro x ⟨y, Uxy⟩
+  rcases U_open x y Uxy with ⟨Ux, Vy, h⟩; clear U_open
+  exists Ux
+  intro x' Ux_x'
+  replace h := h x' Ux_x' y Vy.is_nbhd
+  exists y
+
+
+
+theorem subspace_hausdorff_hausdorff {X: Type} (τ: Topology X) (h: τ.hausdorff)
+  (pred: X → Prop): (τ.subspace_topology pred).hausdorff := by
+    intro ⟨x, pred_x⟩ ⟨y, pred_y⟩ condition
+    apply Subtype.ext
+    dsimp
+    replace h := h x y
+    apply h
+    intro ⟨U, U_open, U_x⟩ ⟨V, V_open, V_y⟩
+    dsimp
+    replace condition := condition {
+      in_nbhd := U ∘ Subtype.val,
+      nbhd_open := by
+        exists U
+      is_nbhd := U_x
+    } {
+      in_nbhd := V ∘ Subtype.val,
+      nbhd_open := by exists V
+      is_nbhd := V_y
+    }
+    dsimp at condition
+    rcases condition with ⟨⟨p, pred_p⟩, what, huh⟩
+    exists p
+
+
+
+
+theorem closed_subspace_compact_compact {X: Type} (τ: Topology X) (c: τ.Compact)
+  (pred: X → Prop) (closed: τ.is_closed pred): (τ.subspace_topology pred).Compact := by
+  intro Y τ₂ C C_open
+  dsimp [product_topology] at *
+  apply τ₂.open_of_eq_open_set (fun y => ∀x, ∀pred_x, C (⟨x, pred_x⟩,y))
+  · intro y
+    simp
+
+
+
+def closed_map {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y): Prop :=
+  ∀C: X → Prop, τ₁.is_closed C → τ₂.is_closed (fun y => ∃x, f x = y ∧ C x)
+
+def image_closed_map_closed {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X → Y)
+  (closed: closed_map τ₁ τ₂ f): τ₂.is_closed (fun y => ∃x, f x = y) := by
+    apply τ₂.open_of_eq_open_set (fun y => ¬ ∃x, f x = y ∧ (fun _ => True) x)
+    intro y
+    simp
+    apply closed
+    exact Topology.whole_set_closed τ₁
