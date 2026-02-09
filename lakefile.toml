@@ -1,0 +1,7 @@
+name = "topology"
+version = "0.1.0"
+defaultTargets = ["Topology"]
+
+[[lean_lib]]
+name = "Topology"
+
