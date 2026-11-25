@@ -1,6 +1,8 @@
 import Topology.Sets
 import Topology.Functions
 
+
+
 structure Topology (X: Type) where
   is_open: Set X → Prop
   open_all: is_open Set.all
@@ -194,6 +196,31 @@ def all_nbhd (x: X): τ.open_nbhd x where
   toSet := Set.all
   nbhd_open := τ.open_all
   is_nbhd := trivial
+
+
+theorem open_union {A B : Set X} (hA: τ.is_open A) (hB: τ.is_open B) : τ.is_open (A ∪ B) := by
+  refine open_of_open_cover_subsets' τ (A ∪ B) ?_
+  rintro x (hx | hx)
+  · exists ⟨A, hA, hx⟩
+    simp [Set.subset_union_left]
+  · exists ⟨B, hB, hx⟩
+    simp [Set.subset_union_right]
+
+theorem open_set_union {F: Set (Set X)} (hf: ∀S ∈ F, τ.is_open S): τ.is_open (Set.set_union F) := by
+  refine open_of_open_cover_subsets' τ F.set_union ?_
+  intro x hx
+  obtain ⟨U, hU, hx⟩ := hx
+  exists ⟨U, hf U hU, hx⟩
+  simp
+  intro y hy
+  exists U
+
+theorem closed_set_inter {F: Set (Set X)} (hf: ∀S ∈ F, τ.is_closed S): τ.is_closed (Set.set_inter F) := by
+  refine (is_closed_iff_is_open_complement τ F.set_inter).mpr ?_
+  simp [Set.complement_set_inter]
+  refine open_set_union τ ?_
+  rintro U ⟨V, hV, rfl⟩
+  exact hf V hV
 
 end
 

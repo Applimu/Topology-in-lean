@@ -370,8 +370,6 @@ theorem finite_fin (n: Nat): Finite (Fin n):= by
 structure finite {X: Type u} (S: Set X): Prop where
   max_exists: ∀F, Set.nonempty F → ∃M ∈ F, ∀s ∈ F, M ∩ S ⊆ s → M ∩ S = s ∩ S
 
-#check Acc
-
 theorem finite_set_iff_minimal_exists {X: Type u} {S: Set X} : finite S ↔ ∀F, Set.nonempty F → ∃M ∈ F, ∀s ∈ F, s ∩ S ⊆ M → M ∩ S = s ∩ S where
   mp S_finite F F_nonempty := by
     obtain ⟨M, ⟨M', hM', heq⟩, M_maximal⟩ := S_finite.max_exists (Set.image Set.complement F) (by
@@ -427,23 +425,23 @@ theorem finite'_induction {X: Type u} {motive: Set X → Prop} (s: Set X) (s_fin
       y ⊂ s' := by assumption
   apply h c this.left
 
-noncomputable def finite'_fix {X: Type u} {C: Set X → Sort v} (s: Set X) (s_finite: finite' s)
-  (F: ∀s' ⊆ s, (∀y ⊂ s', C y) → C s'): C s := by
-  induction s_finite
-  case intro s' hs' ih =>
-  apply F s' (Set.subset_refl _)
-  intro y y_ssub
-  apply ih y y_ssub
-  intro c hc
-  exact F c (Set.subset_trans _ _ _ hc y_ssub.left)
+-- noncomputable def finite'_fix {X: Type u} {C: Set X → Sort v} (s: Set X) (s_finite: finite' s)
+--   (F: ∀s' ⊆ s, (∀y ⊂ s', C y) → C s'): C s :=
+--   -- finite'.rec (fun s h h_ih F =>
+--   --     F s (Set.subset_refl _) fun y y_ssub =>
+--   --         h_ih y y_ssub fun c hc =>
+--   --             F c (Set.subset_trans _ _ _ hc y_ssub.left)
+--   --   ) s_finite F
 
-#print finite'_fix
 
-theorem empty_finite' {X: Type u}: @finite' X Set.empty := by
-  apply finite'.intro
-  intro s ⟨hs, hneq⟩
-  obtain rfl := Set.subset_empty s hs
-  contradiction
+--   by
+--   apply finite'_induction (motive := C)
+--   case intro s' hs' ih =>
+--   apply F s' (Set.subset_refl _)
+--   intro y y_ssub
+--   apply ih y y_ssub
+--   intro c hc
+--   exact F c (Set.subset_trans _ _ _ hc y_ssub.left)
 
 theorem finite'_of_subset_finite' {X: Type u} {s₁ s₂: Set X} (s₂_finite: finite' s₂) (h_sub: s₁ ⊆ s₂): finite' s₁ := by
   induction s₂_finite
@@ -454,6 +452,13 @@ theorem finite'_of_subset_finite' {X: Type u} {s₁ s₂: Set X} (s₂_finite: f
     exact finite'.intro s₁ h
   case neg hneq =>
     exact h s₁ ⟨h_sub, hneq⟩
+
+theorem empty_finite' {X: Type u}: @finite' X Set.empty := by
+  apply finite'.intro
+  intro s ⟨hs, hneq⟩
+  obtain rfl := Set.subset_empty s hs
+  contradiction
+
 
 theorem finite'_imp_image_finite' {X Y: Type u} {f: X → Y} {s: Set X}: finite' s → finite' (Set.image f s) := by
   intro s_finite
@@ -482,23 +487,23 @@ theorem finite'_imp_image_finite' {X Y: Type u} {f: X → Y} {s: Set X}: finite'
   have h_finite := ih _ ssub
   apply finite'_of_subset_finite' h_finite sub
 
-noncomputable def size {X: Type u} (s: Set X) (s_finite: finite' s): Nat :=
-  finite'_fix s s_finite fun s' s'_sub_s f =>
-    open Classical in
-    if h: s'.nonempty then
-      have ssub: s' ∩ Set.complement {h.choose} ⊂ s' := by
-        constructor
-        exact @Set.inter_subset_left X s' (Set.complement {h.choose})
-        simp
-        intro h_sub
-        apply @h_sub h.choose h.choose_spec rfl
-      Nat.succ (f (s' ∩ Set.complement {h.choose}) ssub )
-    else
-      0
+-- noncomputable def size {X: Type u} (s: Set X) (s_finite: finite' s): Nat :=
+--   finite'_fix s s_finite fun s' s'_sub_s f =>
+--     open Classical in
+--     if h: s'.nonempty then
+--       have ssub: s' ∩ Set.complement {h.choose} ⊂ s' := by
+--         constructor
+--         exact @Set.inter_subset_left X s' (Set.complement {h.choose})
+--         simp
+--         intro h_sub
+--         apply @h_sub h.choose h.choose_spec rfl
+--       Nat.succ (f (s' ∩ Set.complement {h.choose}) ssub )
+--     else
+--       0
 
-theorem size_empty {X: Type u}: @size X Set.empty (empty_finite') = 0 := by
-  simp [size, finite'_fix]
-  split
+-- theorem size_empty {X: Type u}: @size X Set.empty (empty_finite') = 0 := by
+--   simp [size, f]
+--   split
 
 
 theorem inter_ssub_of_not_sub (A B: Set X): ¬B ⊆ A → A ∩ B ⊂ B := by
@@ -563,128 +568,14 @@ theorem finite'_union_singleton_imp_finite' {X: Type u} (s: Set X) (s_finite: fi
     rw [← this]
     exact ih _ h_ssub
 
-theorem finite'_union_finite' {X: Type u} {A B: Set X} (A_finite: finite' A) (B_finite: finite' B) : finite' (A ∪ B) := by
-
-  generalize hA': A ∩ B.complement = A'
-  have : A ∪ B = A' ∪ B := by
-    subst hA'
-    rw [Set.inter_union_right]
-    simp
-  rw [this]
-  have disjoint : A' ∩ B = Set.empty := by
-    subst hA'
-    rw [← Set.inter_assoc]
-    simp
-  have A'_finite: finite' A' := by
-    subst hA'
-    apply finite'_of_subset_finite' A_finite
-    exact @Set.inter_subset_left X A B.complement
-
-  clear A_finite hA' this A
-
-  apply finite'_induction A' A'_finite
-  intro s hs (ih: ∀s', _)
-  have s_finite : finite' s := finite'_of_subset_finite' A'_finite hs
-
-
-
-  apply finite'.intro
-  intro s' ⟨s'_sub, s'_neq⟩
-
-  by_cases s' ⊆ s
-  case pos h_sub =>
-    apply finite'_of_subset_finite' s_finite h_sub
-  case neg h =>
-
-    have ssub : s' ∩ s ⊂ s := by
-      refine inter_ssub_of_not_sub s' s ?_
-      intro s_sub
-
-      have B_not_sub_s : ¬ B ⊆ s := by
-        intro h_sub_s
-        have : s ∪ B = s := by exact (Set.union_eq_iff_subset s B).mpr h_sub_s
-        rw [this] at s'_sub s'_neq
-        exact h s'_sub
-
-      have B_not_sub_s' : ¬ B ⊆ s' := by
-        intro h_sub_s'
-        apply s'_neq
-        refine Set.subset_antisymm s' (s ∪ B) s'_sub ?_
-        exact @Set.union_subset X s B s' s_sub h_sub_s'
-
-      -- have s_disjoint_B : s ∩ B = Set.empty := by
-      --   refine Set.subset_empty (s ∩ B) ?_
-      --   calc
-      --     s ∩ B ⊆ A' ∩ B := by
-      --       exact @Set.subset_inter_right X s A' B hs
-      --     A' ∩ B = Set.empty := disjoint
-
-      have s'_neq_s: s' ≠ s := by
-        intro rfl
-        exact h (Set.subset_refl _)
-
-      have B_neq_s : B ≠ s := by
-        intro rfl
-        exact B_not_sub_s (Set.subset_refl _)
-
-      -- have B_neq_s' : B ≠ s' := by
-      --   intro rfl
-      --   exact B_not_sub_s' (Set.subset_refl _)
-
-      have : s' ∩ A' ⊆ s := by
-        calc
-          s' ∩ A' ⊆ (s ∪ B) ∩ A' := by
-            exact @Set.subset_inter_right X s' (s ∪ B) A' s'_sub
-          (s ∪ B) ∩ A' ⊆ s := by
-            rw [Set.union_inter_right, Set.inter_comm B A', Set.inter_comm]
-            simp [disjoint, Set.inter_subset_right]
-
-      replace : s' ∩ A' = s := by
-        refine Eq.symm (Set.subset_antisymm s (s' ∩ A') ?_ this)
-        exact @Set.subset_inter X s' A' s s_sub hs
-      subst this
-      simp_all
-      clear s_sub hs ih s_finite A'_finite
-
-      simp [Set.inter_union_right, Set.subset_inter_iff, Set.subset_union_left] at s'_sub s'_neq
-      replace s'_neq : s' ≠ A' ∪ B := by
-        intro heq
-        subst heq
-        simp at s'_neq
-
-      rw [Set.inter_comm, Eq.comm] at s'_neq_s B_neq_s
-      simp at s'_neq_s
-      clear h --simp [Set.subset_inter_iff] at h
-      clear B_not_sub_s B_neq_s
-
-      apply finite'_induction B B_finite
-      intro sB sB_sub ihB
-      simp [Set.ssubset_def] at ihB
-      obtain rfl := ihB Set.empty (Set.empty_subset _)
-      clear sB_sub
-
-
-
-
-
-
-    have sub : s' ⊆ (s' ∩ s) ∪ B := by
-      intro v hv
-      cases s'_sub hv with
-      | inl hv' =>
-        exact Or.inl ⟨hv, hv'⟩
-      | inr hv' =>
-        exact Or.inr hv'
-
-
-    have h_finite := ih _ ssub
-    exact finite'_of_subset_finite' h_finite sub
-
-
-
-
-
-
+/- TODO: Move to `Sets.lean` -/
+theorem Set.sub_imp_exists_pair {A B s: Set X} (h: s ⊆ A ∪ B): ∃s₁ ⊆ A, ∃s₂ ⊆ B, s = s₁ ∪ s₂ := by
+  exists s ∩ A, ?_
+  · exact inter_subset_right s A
+  exists s ∩ B, ?_
+  · exact inter_subset_right s B
+  rw [← inter_union_left, inter_comm, Eq.comm, inter_eq_right_iff_subset]
+  exact h
 
 
 
@@ -706,6 +597,75 @@ theorem not_finite'_imp_exists_infinite_subset {s: Set X}: ¬finite' s → ∃s'
   intro h
   simp at h
   exact inf (finite'.intro s h)
+
+private theorem finite'_disjoint_union_finite {X: Type u} {A B: Set X} (A_finite: finite' A) (B_finite: finite' B) (hAB: A ∩ B = ∅) : finite' (A ∪ B) := by
+  simp at hAB
+  induction A_finite generalizing B
+  case intro A hA ih' =>
+  induction B_finite
+  case intro B hB ih =>
+
+  apply finite'.intro
+  intro s' hs'
+  obtain ⟨sA, hsA, sB, hsB, rfl⟩ := Set.sub_imp_exists_pair hs'.left
+  replace hs' := hs'.right
+  by_cases sA = A
+  case pos heq =>
+    subst heq
+    obtain ⟨b, hb, hb'⟩ : ∃b ∈ B, ¬b ∈ sB := by
+      apply Classical.byContradiction fun nh => ?_
+      simp at nh
+      apply hs'
+      congr
+      apply Set.subset_antisymm
+      · exact hsB
+      · exact nh
+    apply ih sB
+    · constructor
+      assumption
+      intro rfl
+      contradiction
+    -- · exact finite'.intro sA hA
+    · calc
+        sA ∩ sB = sA ∩ (B ∩ sB) := by
+          congr
+          rw [(Set.inter_eq_right_iff_subset _ _).mpr hsB]
+        sA ∩ (B ∩ sB) = (sA ∩ B) ∩ sB := by rw [← Set.inter_assoc]
+        (sA ∩ B) ∩ sB = Set.empty := by simp [hAB]
+  case neg hneq =>
+    have A_ssub: sA ⊂ A := ⟨hsA, hneq⟩
+    apply ih' sA A_ssub
+    · apply finite'_of_subset_finite' ⟨B, hB⟩ hsB
+    refine Set.subset_empty (sA ∩ sB) ?_
+    calc
+      sA ∩ sB ⊆ sA ∩ B := by exact Set.subset_inter_left sB B sA hsB
+      sA ∩ B ⊆ A ∩ B := by exact Set.subset_inter_right sA A B hsA
+      A ∩ B = Set.empty := hAB
+
+
+theorem finite'_union_finite' {X: Type u} {A B: Set X} (A_finite: finite' A) (B_finite: finite' B) : finite' (A ∪ B) := by
+  generalize hB': B ∩ A.complement = B'
+  have hu: A ∪ B = A ∪ B' := by
+    subst hB'
+    rw [Set.union_inter_left, Set.union_comm A A.complement, Set.complement_union_eq_all, Set.inter_all]
+  have hd : A ∩ B' = Set.empty := by
+    subst hB'
+    rw [Set.inter_comm, ← Set.inter_assoc, Set.complement_inter_eq_empty, Set.inter_empty]
+  have B'_sub: B' ⊆ B := by
+    subst hB'
+    exact Set.inter_subset_left B A.complement
+  have B'_finite: finite' B' := by exact finite'_of_subset_finite' B_finite B'_sub
+
+  rw [hu]
+  apply finite'_disjoint_union_finite <;> try assumption
+
+
+
+
+
+
+
+
 
 
 theorem Finite_iff_all_finite' {X: Type u}: Finite X ↔ ∀S: Set X, finite' S where
@@ -765,122 +725,122 @@ theorem iff_iff_iff {A B: Prop} : ((A ↔ B) ↔ B) ↔ A := by
 
 
 
-theorem finite_iff_finite' {X: Type u} (S: Set X): finite S ↔ finite' S where
-  mp S_finite := by
-    rw [finite_set_iff_minimal_exists] at S_finite
-    let U := Set.mk fun s': Set X => finite' s' ∧ s' ⊆ S
+-- theorem finite_iff_finite' {X: Type u} (S: Set X): finite S ↔ finite' S where
+--   mp S_finite := by
+--     rw [finite_set_iff_minimal_exists] at S_finite
+--     let U := Set.mk fun s': Set X => finite' s' ∧ s' ⊆ S
 
-    suffices U = Set.power_set S by
-      simp [Set.ext_iff, U] at this
-      apply finite'.intro
-      intro s ⟨s_sub, s_neq⟩
-      exact this s s_sub
-
-
-
-    apply Classical.byContradiction
-    intro h
-    simp [Set.ext_iff, U] at h
-
-
-    obtain ⟨m, ⟨hm, m_sub⟩, m'_minimal⟩ := S_finite (U.complement ∩ Set.power_set S) (by
-      obtain ⟨s, hs₁, hs₂⟩ := h
-      exists s
-      constructor
-      exact fun ⟨s_fin, _⟩ => hs₂ s_fin
-      exact hs₁
-    )
-    apply hm
-    simp [U]
-    constructor
-    constructor
-    · intro v ⟨v_sub, v_neq⟩
-      suffices v ∈ U by exact this.left
-      apply Classical.byContradiction
-      intro h_nv
-      simp_all
-      have v_sub_S: v ⊆ S := Set.subset_trans _ _ _ v_sub m_sub
-      replace m'_minimal := m'_minimal v h_nv (by
-        exact Set.subset_trans _ _ _ v_sub m_sub
-      )
-      have : v ∩ S = v := by exact (Set.inter_eq_left_iff_subset v S).mpr v_sub_S
-      rw [this] at m'_minimal
-      replace : m ∩ S = m := by exact (Set.inter_eq_left_iff_subset m S).mpr m_sub
-      rw [this, Eq.comm] at m'_minimal
-      exact v_neq (m'_minimal v_sub)
-    · exact m_sub
-
-  mpr h := by
-    rw [finite_set_iff_minimal_exists]
-    intro F F_nonempty
-    apply Classical.byContradiction
-    intro h
-    simp [Classical.skolem] at h
-    obtain ⟨shrink, h_shrink⟩ := h
-    have shrink_in_F s h := (h_shrink s h).left
-    have shrink_ssub s h : shrink s h ∩ S ⊂ s ∩ S := by
-      have ⟨_, h₁, h₂⟩ := h_shrink s h
-      constructor
-      refine @Set.subset_inter X s S (shrink s h ∩ S) h₁ ?_
-      exact @Set.inter_subset_right X (shrink s h) S
-      exact fun a => h₂ (id (Eq.symm a))
-    clear h_shrink
-
-    obtain ⟨s, hsF⟩ := F_nonempty
-
-    have : s ∩ S ⊆ S := by exact @Set.inter_subset_right X s S
-    replace := finite'_of_subset_finite' h this
-    apply finite'_induction (motive := fun _ => False) _ this
-    intro k hk
+--     suffices U = Set.power_set S by
+--       simp [Set.ext_iff, U] at this
+--       apply finite'.intro
+--       intro s ⟨s_sub, s_neq⟩
+--       exact this s s_sub
 
 
 
+--     apply Classical.byContradiction
+--     intro h
+--     simp [Set.ext_iff, U] at h
 
 
-    revert F_nonempty
-    apply (Set.not_nonempty_iff_eq_empty F).mpr
+--     obtain ⟨m, ⟨hm, m_sub⟩, m'_minimal⟩ := S_finite (U.complement ∩ Set.power_set S) (by
+--       obtain ⟨s, hs₁, hs₂⟩ := h
+--       exists s
+--       constructor
+--       exact fun ⟨s_fin, _⟩ => hs₂ s_fin
+--       exact hs₁
+--     )
+--     apply hm
+--     simp [U]
+--     constructor
+--     constructor
+--     · intro v ⟨v_sub, v_neq⟩
+--       suffices v ∈ U by exact this.left
+--       apply Classical.byContradiction
+--       intro h_nv
+--       simp_all
+--       have v_sub_S: v ⊆ S := Set.subset_trans _ _ _ v_sub m_sub
+--       replace m'_minimal := m'_minimal v h_nv (by
+--         exact Set.subset_trans _ _ _ v_sub m_sub
+--       )
+--       have : v ∩ S = v := by exact (Set.inter_eq_left_iff_subset v S).mpr v_sub_S
+--       rw [this] at m'_minimal
+--       replace : m ∩ S = m := by exact (Set.inter_eq_left_iff_subset m S).mpr m_sub
+--       rw [this, Eq.comm] at m'_minimal
+--       exact v_neq (m'_minimal v_sub)
+--     · exact m_sub
+
+--   mpr h := by
+--     rw [finite_set_iff_minimal_exists]
+--     intro F F_nonempty
+--     apply Classical.byContradiction
+--     intro h
+--     simp [Classical.skolem] at h
+--     obtain ⟨shrink, h_shrink⟩ := h
+--     have shrink_in_F s h := (h_shrink s h).left
+--     have shrink_ssub s h : shrink s h ∩ S ⊂ s ∩ S := by
+--       have ⟨_, h₁, h₂⟩ := h_shrink s h
+--       constructor
+--       refine @Set.subset_inter X s S (shrink s h ∩ S) h₁ ?_
+--       exact @Set.inter_subset_right X (shrink s h) S
+--       exact fun a => h₂ (id (Eq.symm a))
+--     clear h_shrink
+
+--     obtain ⟨s, hsF⟩ := F_nonempty
+
+--     have : s ∩ S ⊆ S := by exact @Set.inter_subset_right X s S
+--     replace := finite'_of_subset_finite' h this
+--     apply finite'_induction (motive := fun _ => False) _ this
+--     intro k hk
 
 
-    let U := Set.mk fun u => ∀x ⊆ u, ¬u ∈ F
-
-    suffices Inductive (· ⊂ ·) U by
-      have clearly : U ∩ F = Set.empty := by
-        ext x
-        simp [U]
-        exact fun h => h x (Set.subset_refl x)
-      have : U ∩ F = F := by
-        refine (Set.inter_eq_right_iff_subset U F).mpr ?_
-        have : ∀s, finite' s → s ∈ U := by
 
 
 
-        intro s hs s' s'_sub_s hs'
-
-        sorry
-      rw [this] at clearly
-      exact clearly
-
-    constructor
-    intro z hz
-    have z_minimal : ∀y, y ∩ S ⊂ z → ¬ y ∈ F := by
-      intro y hy
-      have y_ssub: y ⊂ z := by
-        constructor
+--     revert F_nonempty
+--     apply (Set.not_nonempty_iff_eq_empty F).mpr
 
 
-      apply hz y y_ssub y (Set.subset_refl y)
-    have : ¬ z ∈ F := by
-      intro z_in_F
-      have ⟨h₁, h₂, h₃⟩ := h_shrink z z_in_F
-      have h₄: shrink z z_in_F ∩ S ⊂ z := by
-        constructor
-        exact h₂
-        intro heq
-        rw (occs := [1]) [← heq] at h₃
-        simp [Set.inter_self_right] at h₃
-      apply z_minimal (shrink z z_in_F) h₄ h₁
+--     let U := Set.mk fun u => ∀x ⊆ u, ¬u ∈ F
 
-    exact fun _ _ => this
+--     suffices Inductive (· ⊂ ·) U by
+--       have clearly : U ∩ F = Set.empty := by
+--         ext x
+--         simp [U]
+--         exact fun h => h x (Set.subset_refl x)
+--       have : U ∩ F = F := by
+--         refine (Set.inter_eq_right_iff_subset U F).mpr ?_
+--         have : ∀s, finite' s → s ∈ U := by
+
+
+
+--         intro s hs s' s'_sub_s hs'
+
+--         sorry
+--       rw [this] at clearly
+--       exact clearly
+
+--     constructor
+--     intro z hz
+--     have z_minimal : ∀y, y ∩ S ⊂ z → ¬ y ∈ F := by
+--       intro y hy
+--       have y_ssub: y ⊂ z := by
+--         constructor
+
+
+--       apply hz y y_ssub y (Set.subset_refl y)
+--     have : ¬ z ∈ F := by
+--       intro z_in_F
+--       have ⟨h₁, h₂, h₃⟩ := h_shrink z z_in_F
+--       have h₄: shrink z z_in_F ∩ S ⊂ z := by
+--         constructor
+--         exact h₂
+--         intro heq
+--         rw (occs := [1]) [← heq] at h₃
+--         simp [Set.inter_self_right] at h₃
+--       apply z_minimal (shrink z z_in_F) h₄ h₁
+
+--     exact fun _ _ => this
 
 
 
@@ -956,7 +916,7 @@ theorem finite_of_subset_finite {S₁ S₂: Set X} (sub: S₁ ⊆ S₂) (finite�
     ext x
     simp
     intro hs
-    exact sub
+    exact @sub x
 
   apply finite.mk
   intro F F_nonempty
@@ -973,29 +933,29 @@ theorem finite_of_subset_finite {S₁ S₂: Set X} (sub: S₁ ⊆ S₂) (finite�
   exact @Set.inter_subset_right X M' S₁
 
 
-theorem finite_imp_subtype_finite {X: Type u} {S: Set X} (S_finite: finite S): Finite (S.subtype) := by
-  rw [finite_iff_maximal_exists]
-  intro F ⟨s, hs⟩
-  have this : @Surjective (Set (Set X)) (Set (Set S.subtype)) (Set.preimage $ Set.image Subtype.val) := by
-    refine (Set.preimage_surj_iff_inj (Set.image Subtype.val)).mpr ?_
-    refine (Set.image_inj_iff_inj Subtype.val).mpr ?_
-    exact Subtype.val_inj
-  induction F using this.ind
-  case k F =>
-  clear this
-  simp_all [Set.image_preimage_eq_inter_full_image, Set.preimage_sub_preimage_iff, Set.preimage_eq_preimage_iff]
-  rw [subtype_full_image_val]
-  obtain ⟨M, hM, heq⟩ := S_finite.max_exists (Set.image (· ∩ S) F) (by
-    exists Set.image Subtype.val s, Set.image Subtype.val s
-    simp [hs]
-    intro ⟨x, hx⟩ hsx
-    exact hx
-  )
-  obtain ⟨M, hM, rfl⟩ := hM
+-- theorem finite_imp_subtype_finite {X: Type u} {S: Set X} (S_finite: finite S): Finite (S.subtype) := by
+--   rw [finite_iff_maximal_exists]
+--   intro F ⟨s, hs⟩
+--   have this : @Surjective (Set (Set X)) (Set (Set S.subtype)) (Set.preimage $ Set.image Subtype.val) := by
+--     refine (Set.preimage_surj_iff_inj (Set.image Subtype.val)).mpr ?_
+--     refine (Set.image_inj_iff_inj Subtype.val).mpr ?_
+--     exact Subtype.val_inj
+--   induction F using this.ind
+--   case k F =>
+--   clear this
+--   simp_all [Set.image_preimage_eq_inter_full_image, Set.preimage_sub_preimage_iff, Set.preimage_eq_preimage_iff]
+--   rw [subtype_full_image_val]
+--   obtain ⟨M, hM, heq⟩ := S_finite.max_exists (Set.image (· ∩ S) F) (by
+--     exists Set.image Subtype.val s, Set.image Subtype.val s
+--     simp [hs]
+--     intro ⟨x, hx⟩ hsx
+--     exact hx
+--   )
+--   obtain ⟨M, hM, rfl⟩ := hM
 
 
-  exists M ∩ S
-  simp_all
+--   exists M ∩ S
+--   simp_all
 
 
 theorem bounded_inj_imp_finite {A: Type} {f: A → Nat} (f_inj: Injective f) (bounded: ∃bound, ∀x, f x ≤ bound): Finite A := by
@@ -1032,13 +992,27 @@ theorem fin_set_finite' (n: Nat): finite' (Nat.fin_set n) := by
   case succ n' ih =>
     rw [Nat.fin_set_succ_eq]
     apply finite'_union_finite'
+    · exact ih
+    · exact singleton_finite' n'
 
+theorem Nat.fin_set_finite (bound: Nat): finite (Nat.fin_set bound) := by
+  induction bound
+  · simp
+    exact Set.empty_finite
+  case succ n ih =>
+    simp [Nat.fin_set_succ_eq]
+    refine finite_union_finite ih ?_
+    exact Set.singleton_finite n
 
 
 theorem bounded_set_imp_finite (S: Set Nat) (bounded: ∃bound, ∀x ∈ S, x ≤ bound): finite S := by
   obtain ⟨bound, h_bound⟩ := bounded
-  apply finite.mk
-  intro F F_nonempty
+  apply finite_of_subset_finite (S₂ := Nat.fin_set (bound + 1))
+  · intro x hx
+    simp
+    specialize h_bound x hx
+    exact Nat.lt_succ_of_le h_bound
+  · exact Nat.fin_set_finite (bound + 1)
 
 
 
@@ -1094,70 +1068,71 @@ theorem transgen_eq_succ_eq_lt : Relation.TransGen (fun (n m: Nat) => n.succ = m
       apply Relation.TransGen.tail (b := m') <;> trivial
 
 
-/--
-  For any function into a well-ordered set, there exists a covering of that set
--/
-theorem finite_imp_covering_WF {A B: Type} (A_finite: Finite A) (r: B → B → Prop) (r_wf: WellFounded r) (r_trans: ∀a b c, r a b → r b c → r a c)
-  (f: A → B): ∃covering: Set B, finite covering ∧ ∀a: A, ∃bound ∈ covering, r (f a) bound := by
-  -- accs is the set of all sets of the form
-  by_cases Nonempty B
-  case neg h_empty =>
-    exists Set.empty
-    constructor
-    sorry
-    sorry
+-- /--
+--   For any function into a well-ordered set, there exists a covering of that set
+-- -/
+-- theorem finite_imp_covering_WF {A B: Type} (A_finite: Finite A) (r: B → B → Prop) (r_wf: WellFounded r) (r_trans: ∀a b c, r a b → r b c → r a c)
+--   (f: A → B): ∃covering: Set B, finite covering ∧ ∀a: A, ∃bound ∈ covering, r (f a) bound := by
+--   -- accs is the set of all sets of the form
+--   by_cases Nonempty B
+--   case neg h_empty =>
+--     exists Set.empty
+--     constructor
+--     sorry
+--     sorry
+--   case pos nonempty =>
 
 
-  let accs := Set.full_image fun (b: B) => Set.mk fun i => r i b
+--   let accs := Set.full_image fun (b: B) => Set.mk fun i => r i b
 
-  -- We need to prove that this is nonempty
-  have empty_in_accs : Set.empty ∈ Set.image (Set.preimage f) accs := by
-    exists Set.empty
-    simp [accs, Set.ext_iff]
-    apply Classical.byContradiction
-    intro h
-    simp [Classical.skolem] at h
-    obtain ⟨descend, h_chain⟩ := h
-    rcases nonempty with ⟨b⟩
-    have acc := Acc.transGen $ B_wf.apply b
-    induction acc using @Acc.rec
-    case h.intro b' hb ih =>
-    apply ih (descend b') (h_chain b')
+--   -- We need to prove that this is nonempty
+--   have empty_in_accs : Set.empty ∈ Set.image (Set.preimage f) accs := by
+--     exists Set.empty
+--     simp [accs, Set.ext_iff]
+--     apply Classical.byContradiction
+--     intro h
+--     simp [Classical.skolem] at h
+--     obtain ⟨descend, h_chain⟩ := h
+--     rcases nonempty with ⟨b⟩
+--     have acc := Acc.transGen $ r_wf.apply b
+--     induction acc using @Acc.rec
+--     case h.intro b' hb ih =>
+--     apply ih (descend b') (h_chain b')
 
-  obtain ⟨M, ⟨M', hM', heq⟩, maximal⟩ := A_finite.max_exists (Set.image (Set.preimage f) accs) ⟨Set.empty, empty_in_accs⟩
-  subst heq
-  simp [accs] at hM'
-  obtain ⟨bound, h_bound⟩ := hM'
-  subst h_bound
-  exists bound
-  intro a
-  simp at maximal
-  change ∀s, _ at maximal
+--   obtain ⟨M, ⟨M', hM', heq⟩, maximal⟩ := A_finite.max_exists (Set.image (Set.preimage f) accs) ⟨Set.empty, empty_in_accs⟩
+--   subst heq
+--   simp [accs] at hM'
+--   obtain ⟨bound, h_bound⟩ := hM'
+--   subst h_bound
+--   exists bound
+--   intro a
+--   simp at maximal
+--   change ∀s, _ at maximal
 
-  by_cases ∃a', Relation.TransGen r (f a) (f a')
-  case pos hxist =>
-    obtain ⟨a', ha'⟩ := hxist
-    apply Classical.byContradiction
-    intro h
-    replace maximal := maximal (Set.mk fun i => Relation.TransGen r i (f a')) (by exists f a') (by
-      intro x hx
-      simp at ⊢ hx
-      have p₁: ¬ Relation.TransGen r (f a') bound := by
-        intro bad
-        exact h (Relation.TransGen.trans ha' bad)
-      have p₂: ¬ Relation.TransGen r (f a') (f x) := by
-        intro bad
-        exact p₁ (Relation.TransGen.trans bad hx)
-      -- We need totality here to solve this
-      sorry
-    )
-    simp at maximal
+--   by_cases ∃a', Relation.TransGen r (f a) (f a')
+--   case pos hxist =>
+--     obtain ⟨a', ha'⟩ := hxist
+--     apply Classical.byContradiction
+--     intro h
+--     replace maximal := maximal (Set.mk fun i => Relation.TransGen r i (f a')) (by exists f a') (by
+--       intro x hx
+--       simp at ⊢ hx
+--       have p₁: ¬ Relation.TransGen r (f a') bound := by
+--         intro bad
+--         exact h (Relation.TransGen.trans ha' bad)
+--       have p₂: ¬ Relation.TransGen r (f a') (f x) := by
+--         intro bad
+--         exact p₁ (Relation.TransGen.trans bad hx)
+--       -- We need totality here to solve this
+--       sorry
+--     )
+--     simp at maximal
 
-  case neg h =>
-    simp at h
+--   case neg h =>
+--     simp at h
 
-    replace maximal := maximal (Set.mk fun b => Relation.TransGen r (f a) b) (by sorry)
-    simp [Set.subset_def, h] at maximal
+--     replace maximal := maximal (Set.mk fun b => Relation.TransGen r (f a) b) (by sorry)
+--     simp [Set.subset_def, h] at maximal
 
 
 /-
@@ -1551,40 +1526,26 @@ theorem exists_inj_imp_le {n m: Nat} (f: Fin n → Fin m) (f_inj: Injective f): 
     exact ih f' f'_inj
 
 
-
 theorem exists_surj_imp_le {n m: Nat} (f: Fin n → Fin m) (f_surj: Surjective f): m ≤ n := by
-  induction n --generalizing m
-  case zero =>
+  by_cases n = 0
+  case pos heq =>
+    subst heq
     apply Classical.byContradiction
-    intro hlt
-    simp [Nat.not_le, -Nat.le_zero_eq] at hlt
-    obtain ⟨fin_zero, h⟩ := f_surj.exists_ap_eq ⟨0, hlt⟩
-    nomatch fin_zero
-  case succ n' ih =>
-    by_cases n' + 1 ≤ m
-    case pos hle =>
-      sorry
-    case neg hneq =>
-      apply Nat.le_succ_of_le
+    intro h
+    rw [Nat.not_le] at h
+    obtain ⟨what, _⟩ := f_surj.exists_ap_eq ⟨0, h⟩
+    nomatch what
+  case neg hneq =>
+    have hlt : 0 < n := by exact Nat.zero_lt_of_ne_zero hneq
+    have : Nonempty (Fin n) := ⟨⟨0, hlt⟩⟩
 
-      apply ih
-      sorry
-      sorry
+    have := surj_imp_inv_inj f_surj
+    exact exists_inj_imp_le (inv f) this
 
 theorem fin_le_imp_not_surj {n m: Nat} (h: n < m) {f: Fin n → Fin m}: ¬Surjective f := by
-  induction m
-  case zero => nomatch h
-  case succ m' ih =>
-    by_cases n = m'
-    case pos heq =>
-      subst heq
-      intro f_surj
-
-      sorry
-    case neg hneq =>
-      replace h : n < m' := by omega
-      clear hneq
-      apply?
+  intro f_surj
+  have hle := exists_surj_imp_le f f_surj
+  omega
 
 def Option.swap_none {A} [DecidableEq A] (a: A): Option A → Option A
 | some b =>
@@ -1765,12 +1726,12 @@ theorem Classical.prop_finite : Finite Prop := by
   by_cases h₁:p₁ <;> by_cases h₂: p₂ <;> simp_all
 
 
-theorem finite_fn_finite_finite {X Y: Type} (X_finite: Finite X) (Y_finite: Finite Y): Finite (X → Y) := by
-  refine (finite_iff_maximal_exists (X → Y)).mpr ?_
-  intro F F_nonempty
-  sorry
+-- theorem finite_fn_finite_finite {X Y: Type} (X_finite: Finite X) (Y_finite: Finite Y): Finite (X → Y) := by
+--   refine (finite_iff_maximal_exists (X → Y)).mpr ?_
+--   intro F F_nonempty
+--   sorry
 
--- i don't think that this is the best name
+-- i don't think that nilpotent is the right descriptor here
 theorem finite_imp_nilpotent {X: Type u} (X_finite: Finite X)
 (f: X → X): ∃n, Set.full_image (Nat.repeat f (n + 1)) = Set.full_image (Nat.repeat f n) := by
 

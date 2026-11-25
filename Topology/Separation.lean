@@ -7,10 +7,6 @@ variable {X: Type} (τ: Topology X)
 
 def isHausdorff : Prop := ∀x y: X, (∀U: τ.open_nbhd x, ∀V: τ.open_nbhd y, Set.nonempty (U.nbhd ∩ V.nbhd)) → x = y
 
--- Maybe look into this?
-structure HausdorffSpace extends Topology X where
-  eq_of_nbhds_always_intersect : toTopology.isHausdorff
-
 theorem hausdorff_ext (hausdorff: τ.isHausdorff): ∀x y: X, (∀U: τ.open_nbhd x, ∀V: τ.open_nbhd y,
     ∃p: X, p ∈ U.nbhd ∩ V.nbhd) → x = y := hausdorff
 

@@ -28,14 +28,14 @@ def Cardinal.ind {motive: Cardinal.{v} → Prop} (c: ∀A: Type v, motive $ card
   case a A =>
   exact c A
 
-#check Quotient.liftOn₂
-
 def Cardinal.liftOn.{u} (a: Cardinal.{u}) (f: Type u → β) (h: ∀A B, A ≈ B → f A = f B): β :=
   Quotient.liftOn a f h
 
 def Cardinal.liftOn₂.{u} (a b: Cardinal.{u}) (f: Type u → Type u → β)
 (h: ∀A₁ B₁ A₂ B₂, A₁ ≈ A₂ → B₁ ≈ B₂ → f A₁ B₁ = f A₂ B₂): β :=
   Quotient.liftOn₂ a b f h
+
+theorem Cardinal.card_eq_card_iff : card A = card B ↔ A ≈ B := ⟨Quotient.exact, Quotient.sound⟩
 
 def Cardinal.succ (a: Cardinal): Cardinal := Quotient.liftOn a (fun A => card (Option A)) (by
   intro A B ⟨f, f_bij⟩
@@ -199,19 +199,114 @@ theorem Cardinal.fin_mono : n ≤ m → fin n ≤ fin m := by
   exists Fin.castLE hle
   exact Fin.castLE_inj
 
-def Cardinal.isInfinite (a: Cardinal): Prop := ∀n: Nat, Cardinal.fin n ≤ a
+theorem Cardinal.le_add_right {n m: Cardinal} : n ≤ n + m := by
+  induction n using Cardinal.ind
+  induction m using Cardinal.ind
+  case c.c A B =>
+  apply Cardinal.le_def.mpr
+  exists Sum.inl
+  constructor
+  intro a₁ a₂ heq
+  injection heq
+
+theorem Cardinal.le_add_left {n m: Cardinal} : m ≤ n + m := by
+  induction n using Cardinal.ind
+  induction m using Cardinal.ind
+  case c.c A B =>
+  apply Cardinal.le_def.mpr
+  exists Sum.inr
+  constructor
+  intro a₁ a₂ heq
+  injection heq
+
+theorem Cardinal.le_iff_exists {a b: Cardinal}: a ≤ b ↔ ∃c, a + c = b := by
+  constructor
+  · intro hle
+    induction a using Cardinal.ind
+    induction b using Cardinal.ind
+    next A B =>
+    obtain ⟨f, hf⟩ := hle
+    suffices ∃C:  type_of%A , (A ⊕ C) ≈ B by
+      obtain ⟨C, hC⟩ := this
+      exists card C
+      apply Quotient.sound
+      exact hC
+    exists {x:B // ∀a: A, f a ≠ x}
+    exists fun
+      | Sum.inl a => f a
+      | Sum.inr b => b.val
+    constructor <;> constructor
+    · intro a₁ a₂ heq
+      split at heq <;> split at heq <;> simp_all
+      next h1 h2 h3 b =>
+        apply b.property
+        exact heq
+      next _ b _ _ =>
+        apply b.property
+        rw [eq_comm] at heq
+        exact heq
+      next =>
+        apply Subtype.eq heq
+    · intro b
+      by_cases ∃a, f a = b
+      case pos ex =>
+        obtain ⟨a, ha⟩ := ex
+        subst ha
+        exists Sum.inl a
+      case neg ex =>
+        simp at ex
+        exists Sum.inr ⟨b, ex⟩
+  · intro ⟨c, heq⟩
+    subst heq
+    exact le_add_right
+
+theorem Cardinal.zero_le {a: Cardinal}: 0 ≤ a := by
+  rw [le_iff_exists]
+  exists a
+  rw [zero_add]
+
+theorem Cardinal.eq_zero_iff_le_zero {a: Cardinal} : a = 0 ↔ a ≤ 0 := by
+  constructor
+  · intro rfl
+    exact le_refl 0
+  · intro hle
+    apply antisymm _ _ hle zero_le
+
+
+
+
+def Cardinal.isInfinite (a: Cardinal): Prop := Cardinal.countable_inf ≤ a
 
 theorem Cardinal.fin_le_countable_inf (n: Nat): Cardinal.fin n ≤ Cardinal.countable_inf := by
   exists Fin.val
   apply Injective.intro
   exact fun a₁ a₂ a => Fin.eq_of_val_eq a
 
+@[simp]
+theorem Cardinal.fin_add_countable_inf (n: Nat): fin n + countable_inf = countable_inf := by
+  apply antisymm
+  · exists fun
+      | Sum.inl v => v
+      | Sum.inr i => n + i
+    constructor
+    intro a₁ a₂ heq
+    split at heq <;> split at heq
+    all_goals {
+      norm_cast at heq
+      simp_all [Fin.ext_iff, @Eq.comm _  (n + _)]
+      try omega
+    }
+  · exact le_add_left
+
+
 theorem Cardinal.fin_add_infinite (b: Cardinal) (n: Nat) (b_inf: b.isInfinite): Cardinal.fin n + b = b := by
-  induction b using Cardinal.ind
-  case c B =>
-  simp [Cardinal.isInfinite, fin, le_def] at b_inf
-  apply Quotient.sound
-  sorry
+  apply Cardinal.antisymm
+  · rw [isInfinite, le_iff_exists] at b_inf
+    obtain ⟨c, rfl⟩ := b_inf
+    rw [← Cardinal.add_assoc, fin_add_countable_inf]
+    exact Cardinal.le_refl _
+
+  · exact le_add_left
 
 
 theorem Prod.map_inj_of_inj : Injective f → Injective g → Injective (Prod.map f g) := by
@@ -279,6 +374,31 @@ theorem Cardinal.mul_assoc (a b c: Cardinal): a * b * c = a * (b * c) := by
   apply Quotient.sound
   exact ⟨Prod.assoc, Prod.assoc_bij⟩
 
+@[simp]
+theorem Cardinal.mul_one (a: Cardinal): a * 1 = a := by
+  induction a using Cardinal.ind
+  apply Quotient.sound
+  exists fun (a, _) => a
+  apply Bijective.of_exists_inv fun a => (a, 0) <;> funext a <;> simp
+  · rcases a with ⟨a', z⟩
+    simp
+    omega
+
+@[simp]
+theorem Cardinal.one_mul (a: Cardinal): 1 * a = a := by
+  rw [mul_comm, mul_one]
+
+@[simp]
+theorem Cardinal.zero_mul (a: Cardinal): 0 * a = 0 := by
+  induction a using Cardinal.ind
+  apply Quotient.sound
+  exists fun a => nomatch a
+  apply Bijective.of_exists_inv fun a => nomatch a <;> funext c <;> nomatch c
+
+@[simp]
+theorem Cardinal.mul_zero (a: Cardinal): a * 0 = 0 := by
+  rw [mul_comm, zero_mul]
+
 def prod_sum : A × (B ⊕ C) → A × B ⊕ A × C
 | (a, Sum.inl b) => Sum.inl (a,b)
 | (a, Sum.inr c) => Sum.inr (a,c)
@@ -303,6 +423,39 @@ theorem Cardinal.mul_add (a b c: Cardinal): a * (b + c) = a * b + a * c := by
 theorem Cardinal.add_mul (a b c: Cardinal): (a + b) * c = a * c + b * c := by
   repeat rw [Cardinal.mul_comm _ c]
   exact Cardinal.mul_add c a b
+
+theorem Cardinal.card_neq_zero_iff : card A ≠ 0 ↔ Nonempty A := by
+  constructor
+  · intro (hneq: ¬card A = card (Fin 0))
+    simp [card_eq_card_iff] at hneq
+    replace hneq := fun f x₁ x₂ => hneq ⟨f, x₁, ⟨x₂⟩⟩
+    simp at hneq
+    apply Classical.byContradiction fun h => ?_
+    apply hneq fun a => False.elim $ h ⟨a⟩
+    constructor <;> simp
+    exact fun a => False.elim $ h ⟨a⟩
+  · intro ⟨a⟩ heq
+    rw [eq_zero_iff_le_zero] at heq
+    obtain ⟨f, hf⟩ := heq
+    nomatch f a
+
+
+theorem Cardinal.mul_eq_zero {a b: Cardinal} : a * b = 0 ↔ (a = 0 ∨ b = 0) := by
+  constructor
+  · intro heq
+    induction a using Cardinal.ind
+    induction b using Cardinal.ind
+    next A B =>
+    rw [mul_def] at heq
+    apply Classical.byContradiction fun h => ?_
+    simp at h
+    simp [← ne_eq, card_neq_zero_iff] at h
+    revert heq
+    simp [card_neq_zero_iff]
+    obtain ⟨h₁, h₂⟩ := h
+    apply @instNonemptyProd
+  · rintro (rfl | rfl) <;> simp
+
 
 def Cardinal.pow (a b: Cardinal): Cardinal := Cardinal.liftOn₂ a b (fun A B => card (B → A)) (by
   intro A₁ B₁ A₂ B₂ ⟨fA, A_bij⟩ ⟨fB, B_bij⟩
@@ -379,5 +532,61 @@ theorem Cardinal.one_pow (a: Cardinal) : 1 ^ a = 1 := by
 
 
 
+def Cardinal.top.{u} : Cardinal.{u + 1} := card ((T: Type u) × T)
 
-#check Classical.epsilon
+def Cardinal.plift (a: Cardinal.{u}): Cardinal.{u + 1} := Cardinal.liftOn a (fun A => card (PLift A)) (by
+  intro A B ⟨f, hf⟩
+  apply Quotient.sound
+  exists fun ⟨a⟩ => ⟨f a⟩
+  constructor <;> constructor <;> simp
+  · intro ⟨a₁⟩ ⟨a₂⟩ heq
+    obtain rfl := hf.eq_of_ap_eq a₁ a₂ heq
+    rfl
+  · intro ⟨b⟩
+    obtain ⟨a, rfl⟩ := hf.exists_ap_eq b
+    exists ⟨a⟩
+)
+
+
+
+theorem Cardinal.le_max.{u} (a: Cardinal.{u}): plift a ≤ Cardinal.top := by
+  induction a using Cardinal.ind
+  next A =>
+  exists fun a => ⟨A, a.down⟩
+  constructor
+  intro ⟨a₁⟩ ⟨a₂⟩ heq
+  injection heq with h₁ h₂
+  simpa using h₂
+
+
+def Cardinal.ulift (a: Cardinal.{u}): Cardinal.{max u v} := Cardinal.liftOn a (fun A => card (ULift A)) (by
+  intro A B ⟨f, hf⟩
+  apply Quotient.sound
+  exists fun ⟨a⟩ => ⟨f a⟩
+  constructor <;> constructor <;> simp
+  · intro ⟨a₁⟩ ⟨a₂⟩ heq
+    obtain rfl := hf.eq_of_ap_eq a₁ a₂ heq
+    rfl
+  · intro ⟨b ⟩
+    obtain ⟨a, rfl⟩ := hf.exists_ap_eq b
+    exists ⟨a⟩
+)
+
+-- theorem ULift.down_inj (A: Type u) : Injective.{u, max u v} (ULift.down (ULift.{v,u} A: Type (max u v))) := by
+--   apply Injective.of_exists_left_inv (ULift.up)
+
+-- theorem Cardinal.ulift_inj.{u,v}: Injective (ulift.{u,v}) := by
+--   constructor
+--   intro c₁ c₂ heq
+--   induction c₁ using Cardinal.ind
+--   induction c₂ using Cardinal.ind
+--   next A₁ A₂ =>
+--     apply Quotient.sound
+--     replace heq := Quotient.exact heq
+--     simp [Quotient.exact, ulift] at heq
+--     obtain ⟨f, hf⟩ := heq
+--     let f': A₁ → A₂ := fun a₁ => ULift.down (f ⟨a₁⟩)
+--     exists f'
+--     constructor <;> constructor
+--     · simp [f']
+--       intro x₁ x₂ heq

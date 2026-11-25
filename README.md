@@ -1,12 +1,21 @@
 
 ## About
-This repository contains loads of lean code of what I have been working on and off on for almost a year or so, which is mostly centered around Topology and Finite sets. I started it when I took point-set topology at university, and decided to make a lean library to model it. Over the summer of 2025, it got a bit stale because I had refused to create any kind of model for a set inside of the library to the point that it was becoming hard to work with.
+This repository contains loads of lean code which I created mainly in the spring of 2024 and 2025. It is centered around point-set topology, but also has theorems about set theory, bornology, finite sets, and cardinality. I started it when I took point-set topology at university, and decided to make a lean library to model it. It has since grown, and has a variety of theorems that are not necessarily related to topology directly.
 
-In around September 2025, I decided that I should probably create a form of set theory, which led to the creation of `Sets.lean` which currently contains all of this library's set theory and then `Functions.lean` which contains theorems related to injectivity and surjectivity. 
+Here is a general breakdown of the files in this repo:
+- `Sets.lean` - Basic set theory and set operations
+- `Functions.lean` - Useful properties of functions such as injectivity and constructions such as the image of a function.
+- `Basic.lean` - Basic topology, mainly the definition of a `Topology` on a type.
+- `Closures.lean` - Definition of the closure of a set. Also contains some proofs for problems that I had on an exam in the point-set topology course.
+- `Separation.lean` - Contains predicates that say a topology `isHausdorff` or `isFrechet`
+- `Product.lean` - Contains the definition of the product topology
+- `Compact.lean` - Definition of a compact set using a tube lemma qualification.
+- `Connected.lean` - Defines the notion of a connected topological space.
+- `Bornology.lean` - Definition of a "Bornology" which qualifies an idea of boundedness
+- `Finite.lean` - Contains multiple attempts of defining the idea of a finite type in lean. 
+- `Cardinal.lean` - Defines a cardinal as a quotient on the type `Type u` by the equivalence relation where `A ~ B` iff there exists a bijection between them.
+- `FunctionsMisc.lean` - Contains miscelaneous ideas that I wanted to play around with related to functions, such as cantor's paradox, constant functions, idempotent functions, and the "kernel" of a set-function.
 
-Part of the reason I came back was because I really wanted to define a notion of a finite set/type. I tried in the past in this library to create a "cofinite" type and failed to do so so this time I came back much better prepared to do something like this. In `Finite.lean` I define a type to be finite iff the strict subset relation is well-founded. i.e. there is no infinite descending chain of subsets `... ⊂ S₃ ⊂ S₂ ⊂ S₁`. I specifically define it in a way that works well with constructive mathematics, so it is defined basically the same way that `Acc` is defined in the prelude.
 
-My main goal right now is to prove all of the facts that I consider to be basic about finite sets. I'm currently struggling alot with proving that, to the point that I am considering changing the definition.
 
-I am mainly updating the repo because the code has changed alot since August 2025 when I last posted this on github.
 

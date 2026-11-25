@@ -98,7 +98,9 @@ theorem diagonal_closed_of_hausdorff {X: Type} (τ: Topology X) (h: τ.isHausdor
   exists U; exists V;
   intro x' x'nbhd y' y'nbhd heq
   cases heq
-  exact disjoint x' ⟨x'nbhd, y'nbhd⟩
+  change x' ∈ Set.empty
+  rw [← disjoint]
+  exact ⟨x'nbhd, y'nbhd⟩
 
 theorem hausdorff_of_diagonal_closed {X: Type} (τ: Topology X)
 (h: (product_topology τ τ).is_closed Set.diagonal): τ.isHausdorff := by

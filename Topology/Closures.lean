@@ -83,8 +83,18 @@ theorem cts_iff_preimage_interior_sub_interior_preimage {X Y: Type} (τ₁: Topo
     exact Set.subset_refl _
 
 
+/--
+  Defines a topology on a space by the interior of all every subset. When I wrote this definition I was
+  surprised to find that interestingly, the collection of open sets does not
+  require that the interior function supplied is an idempotent function function
+  `interior (interior A) = interior A`?
+
+  So I guess that this construction accepts a slightly more general class of functions `i: Set X → Set X`,
+  and kind of defines a "closure operator of the interior operator" which sends any of these functions to
+  the idempotent, *real* interior operator.
+-/
 def of_interior {X: Type} (interior: Set X → Set X) (interior_shrinks: ∀A, interior A ⊆ A)
-  (interior_all: interior Set.all = Set.all) (interior_interior: ∀A, interior (interior A) = interior A)
+  (interior_all: interior Set.all = Set.all)
   (interior_inter : ∀A B, interior (A ∩ B) = interior A ∩ interior B): Topology X where
     is_open U := interior U = U
     open_all := interior_all
@@ -106,18 +116,37 @@ def of_interior {X: Type} (interior: Set X → Set X) (interior_shrinks: ∀A, i
       rw [h₁, h₃, Eq.comm, h₁, Set.inter_eq_left_iff_subset] at this
       exact this h₂
 
-
-theorem others_imply_interior_interior {X: Type} (interior: Set X → Set X) (interior_shrinks: ∀A, interior A ⊆ A)
-  (interior_all: interior Set.all = Set.all)
-  (interior_inter : ∀A B, interior (A ∩ B) = interior A ∩ interior B): ∀A, interior (interior A) = interior A := by
+/--
+  In relation to the previous theorem (see source):
+  Proves that a "pseudo interior operator" is the actual interior operator of the topology it generates iff it is idempotent.
+-/
+theorem of_interior_interior_eq_interior_iff_idempotent {X: Type} (interior: Set X → Set X)
+  (interior_shrinks: ∀A, interior A ⊆ A) (interior_all: interior Set.all = Set.all)
+  (interior_inter : ∀A B, interior (A ∩ B) = interior A ∩ interior B):
+  (of_interior interior interior_shrinks interior_all interior_inter).interior = interior ↔ ∀A, interior (interior A) = interior A := by
+  constructor
+  · intro heq
     intro A
-    apply Set.subset_antisymm
-    exact @interior_shrinks (interior A)
-    have := @interior_shrinks A
-    rw [← Set.inter_eq_right_iff_subset] at this
-    rw [← Set.inter_eq_left_iff_subset, ← interior_inter, this]
-    apply Set.subset_antisymm
-    exact @interior_shrinks (interior A)
+    have := interior_interior (of_interior interior interior_shrinks interior_all interior_inter) (U := A)
+    rw [heq] at this
+    exact this
+  · intro interior_interior
+    simp [of_interior, funext_iff, Set.ext_iff]
+    intro A x
+    constructor
+    · intro ⟨⟨N, h₁, h₂⟩, hN⟩
+      dsimp at h₁ hN
+      rw [← Set.ext_iff] at h₁
+      revert h₂ x
+      change N ⊆ interior A
+      rw [← Set.inter_eq_left_iff_subset] at hN
+      rw [← h₁,← Set.inter_eq_left_iff_subset, Eq.comm]
+      rw (occs := [1]) [← hN, interior_inter]
+    · intro xiA
+      exists ⟨interior A, ?_, ?_⟩
+      · simp [interior_interior]
+      · exact xiA
+      · simp [interior_shrinks]
 
 /--
   A point x is in the closure of U iff for every closed set S which is
@@ -172,8 +201,8 @@ theorem closure_closure {X: Type} (τ: Topology X) (A: Set X): τ.closure (τ.cl
   exact is_closed_closure τ A
 
 /--
-  While I do not remember the exact problem at this point, it should be apparent that this is
-  a proof that you can add one point to a topology
+  While I do not remember the exact problem at this point, it should be apparent that this is a
+  construction of a topology with one more point added in
 -/
 def exam_problem_1 {X: Type} (τ: Topology X): Topology (Option X) where
   is_open := fun U => (none ∈ U ∧ (τ.is_open (Set.preimage some U))) ∨ U = Set.empty
@@ -230,16 +259,16 @@ def exam_problem_1 {X: Type} (τ: Topology X): Topology (Option X) where
       replace open_cover_subsets := open_cover_subsets x x_in_U
       obtain ⟨Uₓ, open_idk, x_in_Uₓ, Uₓ_sub_U⟩ := open_cover_subsets
       cases open_idk
-      case h.h.inl k => exact absurd (Uₓ_sub_U k.left) h
+      case h.h.inl k =>
+        exact absurd (Uₓ_sub_U k.left) h
       case h.h.inr heq =>
         subst heq
         exact x_in_Uₓ
 
 
-#check Topology.closure_closed_iff_eq_self
 /--
   I believe this question said "Suppose (X, τ) is a topology such that the closure of
-  every nonempty set is the set X itself. Prove that τ must be the indiscrete topology"
+  every nonempty set is the whole set X itself. Prove that τ must be the indiscrete topology"
 -/
 theorem exam_problem_3 {X: Type} (τ: Topology X) (h: ∀U: Set X, Set.nonempty U → τ.closure U = Set.all):
   τ = Topology.indiscrete_topology X := by
@@ -314,11 +343,6 @@ theorem exam_problem_5 {X Y: Type} (τ₁: Topology X) (τ₂: Topology Y) (f: X
     change (f ∘ inv f) y₂ = y₂
     rw [Surjective.inv_right_inv f_bij.toSurjective]
     rfl
-
-
-
-
-
 
 theorem interior_subset_closure {X: Type} (τ: Topology X) (A: Set X):
   τ.interior A ⊆ τ.closure A := by

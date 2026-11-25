@@ -3,17 +3,10 @@ import Topology.Product
 import Topology.Closures
 
 
-theorem exists_maximal_over (X: Type) (r: X → X → Prop)
-(r_refl: ∀x, r x x)
-(r_wf: ∀U: Set X, Set.nonempty U → ∃m ∈ U, ∀x, r m x → x = m) (y: X): ∃m: X, r y m ∧ ∀x, r m x → x = m := by
-  exact r_wf (Set.mk fun u => r y u) ⟨y, r_refl y⟩
-
-
-
-
 namespace Topology
 /--
-  We define compactness to be close to the tube lemma because proving finiteness sucks
+  We define compactness in relation to the tube lemma, because we don't have
+  access to mathlib's definition of finiteness and creating our own is difficult.
 -/
 def Compact {X: Type} (τ: Topology X): Prop := ∀Y, ∀τ₂: Topology Y,
   ∀C: Set (X × Y), (product_topology τ τ₂).is_open C → τ₂.is_open (Set.snd_tube C)
@@ -121,12 +114,6 @@ theorem closed_subspace_compact_compact {X: Type} (τ: Topology X) (cpct: τ.Com
     exact False.elim (hx' hx'_U)
 
 
-
-
-
-
-
-
-theorem infinite_discrete_set_not_cpct: ¬((discrete_topology Nat).Compact) := by
-  simp [Topology.Compact, discrete_topology, product_topology]
-  sorry
+-- theorem infinite_discrete_set_not_cpct: ¬((discrete_topology Nat).Compact) := by
+--   simp [Topology.Compact, discrete_topology, product_topology]
+--   sorry

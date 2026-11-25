@@ -21,7 +21,7 @@ theorem set_mem_def {A: Set X} {x: X}: A.elem x ↔ x ∈ A := by rfl
 theorem mem_set {x: X} {f: X → Prop}: x ∈ ({elem := f}: Set X) ↔ f x := by rfl
 
 @[simp]
-theorem set_eta {A: Set X} : {elem := fun x => x ∈ A} = A := by rfl
+theorem set_eta {A: Set X} : {elem x := x ∈ A} = A := by rfl
 
 variable (A B C: Set X)
 
@@ -29,7 +29,7 @@ variable (A B C: Set X)
 theorem ext (h: ∀x, x ∈ A ↔ x ∈ B): A = B := by
   cases A <;> cases B
   case mk.mk A B =>
-  simp_all
+  simp_all only [mem_set, mk.injEq]
   funext x
   exact propext (h x)
 
@@ -154,11 +154,6 @@ theorem mem_insert (x: X) (S: Set X) : x ∈ Insert.insert y S ↔ x = y ∨ x �
 -- theorem mem_pair (x y z: X): x ∈ ({y, z}: Set X) ↔ x = y ∨ x = z := by
 --   simp
 
-def complement (A: Set X): Set X := mk fun x => ¬ A.elem x
-
-@[simp]
-theorem complement_def (x: X): x ∈ A.complement ↔ ¬x ∈ A := Iff.rfl
-
 instance : @Trans (Set X) (Set X) (Set X) (· ⊆ ·) (· ⊆ ·) (· ⊆ ·) where
   trans {A B C} := subset_trans A B C
 
@@ -222,6 +217,13 @@ theorem all_subset_iff : all ⊆ A ↔ A = all where
   mp := all_subset A
   mpr heq := by subst heq; exact subset_refl all
 
+
+def complement (A: Set X): Set X := mk fun x => ¬ A.elem x
+
+@[simp]
+theorem complement_def (x: X): x ∈ A.complement ↔ ¬x ∈ A := Iff.rfl
+
+
 @[simp]
 theorem complement_empty : complement (@empty X) = @all X := by
   ext
@@ -245,8 +247,7 @@ theorem complement_complement : complement (complement A) = A := by
 
 @[simp]
 theorem complement_inj : complement A = complement B ↔ A = B := by
-  have : ∀x, Decidable (x ∈ A) := fun x => Classical.propDecidable _
-  have : ∀x, Decidable (x ∈ B) := fun x => Classical.propDecidable _
+  open Classical in
   simp [Set.ext_iff, Decidable.not_iff_not]
 
 def complement_induction {motive: Set X → Sort v} (hc: ∀S: Set X, motive S.complement) (S: Set X): motive S := by
@@ -589,10 +590,6 @@ theorem inter_singleton_nonempty_iff {a: X} : nonempty (A ∩ {a}) ↔ a ∈ A w
   mpr h := by
     exists a
 
-#check Lean.Omega.tidy
-#check Lean.Parser.Tactic.omega
-#check Lean.Meta.Omega.OmegaConfig
-#check Lean.Omega.positivize_sat
 @[simp]
 theorem subset_singleton_iff (x: X): A ⊆ {x} ↔ A = Set.empty ∨ A = {x} where
   mp h := by
@@ -999,6 +996,21 @@ theorem set_union_image_singletons : set_union (image (fun x => {x}) A) = A := b
     exists x
     rfl
 
+
+@[simp]
+theorem set_union_image_singletons' : set_union (image singleton A) = A := by
+  ext x
+  constructor
+  · intro ⟨s, ⟨a, ha, heq⟩, hxs⟩
+    subst heq hxs
+    exact ha
+  · intro hx
+    exists {x}
+    constructor
+    exists x
+    rfl
+
+
 def set_inter : Set X := Set.mk fun x => ∀s ∈ F, x ∈ s
 
 @[simp]
@@ -1081,84 +1093,29 @@ theorem set_inter_power_set : set_inter (power_set A) = Set.empty := by
 
 end
 
-@[simp]
 instance : Monad Set where
-  pure := Set.singleton
+  pure := fun x => {x}
   bind s f := Set.set_union (Set.image f s)
-/-
-instance : LawfulMonad Set where
-  map_const := by
-    intro α β
-    ext a S a'
-    simp
-  id_map := by
-    simp
-    intro α β
-    ext x
-    simp
-    constructor
-    · intro ⟨s, ⟨s', hs', heq⟩, hx⟩
-      subst heq hx
-      exact hs'
-    · intro hs
-      exists {x}
-      constructor
-      exists x
-      rfl
-  seqLeft_eq := by
-    intro α β as bs
-    ext a
-    dsimp
-    constructor
-    · intro ⟨s, ⟨a', ha'as, heq⟩, has⟩
-      subst heq
-      obtain ⟨r, ⟨y, hy, heq⟩, hxr⟩ := has
-      subst heq hxr
-      exists as
-      constructor
-      simp
-      change ∃f, (∃s, s ∈ image (fun x => {Function.const β x}) as ∧ _) ∧ _
-      exists Function.const β a'
 
-      constructor
-      · exists {Function.const β a'}
-        constructor
-        exists a'
-        rfl
-      · ext a''
-        constructor
-        · intro ⟨y, ⟨x, hx, heq⟩, hay⟩
-          subst heq hay
-          exact hx'as
-        · intro has₁
-          exists {a'}
-          constructor
-          exists y
-          constructor
-          assumption
-          simp
-          sorry
-          rfl
-      assumption
-  seqRight_eq := by
-    intro α β as bs
-    simp
-  pure_seq := by
-    intro α β g as
-    ext b
-    simp
-  bind_pure_comp := by
-    intro α β f as
-    ext b
-    simp
-  bind_map := by
-    intro α β fs as
-    ext b
-    simp
+@[simp]
+theorem pure_def {x: X}: (Pure.pure x: Set X) = {x} := by rfl
+
+@[simp]
+theorem bind_def : (Bind.bind s f) = Set.set_union (Set.image f s) := by rfl
+
+@[simp]
+theorem map_def : (Functor.map: (X → Y) → Set X → Set Y) = Set.image := by
+  simp [instMonad, image_comp]
+
+
+instance : LawfulMonad Set := LawfulMonad.mk' Set (
+  id_map := by simp
+) (
   pure_bind := by
     intro α β a f
     ext b
     simp
+) (
   bind_assoc := by
     intro α β γ as f g
     ext c
@@ -1186,13 +1143,7 @@ instance : LawfulMonad Set where
     constructor
     exists a
     all_goals trivial
-
--/
-
-
-
-
-
+)
 
 section
 
@@ -1328,7 +1279,7 @@ end
   `φ A = A`
 -/
 theorem exists_fixed_point (φ: Set X → Set X) (mono: ∀S₁ S₂, S₁ ⊆ S₂ → φ S₁ ⊆ φ S₂): ∃A, φ A = A := by
-  let A := Set.mk fun a => ∀S, φ S ⊆ S → a ∈ S
+  let A := Set.mk fun a => ∀S, φ S ⊆ S → a ∈ S -- `A` is the intersection of all sets which are contracted by `φ`
   have φA_sub: φ A ⊆ A := by
     intro x hx S φS_sub
     apply φS_sub

@@ -57,7 +57,31 @@ end
 
 section
 
+theorem lawvere (A B: Type u) (e: A → (A → B)) (he: Surjective e) (f: B → B): ∃x, f x = x := by
+  obtain ⟨x, hx⟩ := he.exists_ap_eq (fun y => f (e y y))
+  exists e x x
+  apply Eq.subst (motive := fun h => f (e x x) = h x) hx.symm ?_
+  rfl
 
+noncomputable def lawvere_fix {A B: Type u} (e: A → (A → B)) (he: Surjective e) (f: B → B): B :=
+  let x := (he.exists_ap_eq (fun y => f (e y y))).choose
+  e x x
+
+theorem lawvere_fix_fixed {A B: Type u} (e: A → (A → B)) (he: Surjective e) (f: B → B): f (lawvere_fix e he f) = lawvere_fix e he f := by
+  unfold lawvere_fix
+  let x := (he.exists_ap_eq (fun y => f (e y y))).choose
+  change f (e x x) = e x x
+  have hx : e x = fun y => f (e y y) := (he.exists_ap_eq (fun y => f (e y y))).choose_spec
+  apply Eq.subst (motive := fun h => f (e x x) = h x) hx.symm ?_
+  rfl
+
+theorem lawvere_map_nonempty {A B: Type u} (e: A → (A → B)) (he: Surjective e): Nonempty B := ⟨lawvere_fix e he id⟩
+
+-- theorem lawvere_map_subsingleton {A B: Type u} (e: A → (A → B)) (he: Surjective e): Subsingleton B := by
+--   apply Subsingleton.intro
+--   intro a b
+--   obtain ⟨xa, hxa⟩ := he.exists_ap_eq (fun y => a)
+--   obtain ⟨xb, hxb⟩ := he.exists_ap_eq (fun y => b)
 
 
 
@@ -127,6 +151,20 @@ theorem idem_of_id_full_image {e: X → X} (h: ∀x ∈ Set.full_image e, e x = 
     ext x
     exact h (e x) (Set.always_in_image e x)
 
+theorem inj_imp_idem_imp_comm_idem (fg_idem: Idempotent (f ∘ g)) (f_inj: Injective f): Idempotent (g ∘ f) := by
+  apply Idempotent.intro
+  apply Injective.left_cancellative f f_inj
+  change ((f ∘ g) ∘ (f ∘ g)) ∘ f = (f ∘ g) ∘ f
+  rw [fg_idem.comp_self]
+
+
+theorem surj_imp_idem_imp_comm_idem {α: Type u} {β: Type v} {f : α → β} {g: β → α} (fg_idem: Idempotent (f ∘ g)) (g_surj: Surjective g): Idempotent (g ∘ f) := by
+  apply Idempotent.intro
+  apply Surjective.right_cancellative g g_surj
+  change g ∘ ((f ∘ g) ∘ (f ∘ g)) = g ∘ (f ∘ g)
+  rw [fg_idem.comp_self]
+
+
 /-
   L:   ∀x, (∃s, sa = x) ↔ (∃s, sb = x)
   R:   ∀x, (∃s, as = x) ↔ (∃s, bs = x)
@@ -187,69 +225,69 @@ instance idk_equiv {X Y: Type u} [Nonempty (X → Y)]: Equivalence (@idk X Y) wh
     exact h₁ f
     exact h₂ f
 
-theorem idk_comp {X Y Z: Type u} (f₁ g₁: Y → Z) (f₂ g₂: X → Y) (h: ∃i: Z → Y, Injective i):
-idk f₁ g₁ → idk f₂ g₂ → idk (f₁ ∘ f₂) (g₁ ∘ g₂) := by
-  intro h₁ h₂
-  intro r
-  rw [idk_iff] at *
+-- theorem idk_comp {X Y Z: Type u} (f₁ g₁: Y → Z) (f₂ g₂: X → Y) (h: ∃i: Z → Y, Injective i):
+-- idk f₁ g₁ → idk f₂ g₂ → idk (f₁ ∘ f₂) (g₁ ∘ g₂) := by
+--   intro h₁ h₂
+--   intro r
+--   rw [idk_iff] at *
 
-  have : ∀i: Z → Y, Injective i → (f₁ ∘ i = id ↔ g₁ ∘ i = id) := by
-    intro i i_inj
+--   have : ∀i: Z → Y, Injective i → (f₁ ∘ i = id ↔ g₁ ∘ i = id) := by
+--     intro i i_inj
 
-    have hi := h₁ i
-    replace hi : f₁ ∘ i = id ↔ g₁ ∘ i = id := by
-      rw [← Injective.left_cancellative_iff i i_inj]
-      apply Iff.symm
-      rw [← Injective.left_cancellative_iff i i_inj]
-      dsimp
-      exact Iff.symm hi
-    exact hi
-
-
-
-
-
-  have hf₂ := h₁ (f₂ ∘ r)
-  have hg₂ := h₁ (g₂ ∘ r)
-  have hf₁ := h₂ (r ∘ f₁)
-  have hg₁ := h₂ (r ∘ g₁)
-
-
-  constructor
-  . intro heq
-    replace hf₂ : f₂ ∘ (r ∘ g₁ ∘ f₂ ∘ r) = f₂ ∘ r := by
-      change f₂ ∘ (r ∘ (f₁ ∘ f₂) ∘ r) = _ ↔ _ at hf₂
-      rw [heq] at hf₂
-      simp at hf₂
-      exact hf₂
-    replace hf₁: (r ∘ f₁ ∘ g₂ ∘ r) ∘ f₁ = r ∘ f₁ := by
-      change  (r ∘ (f₁ ∘ f₂) ∘ r) ∘ f₁ = r ∘ f₁ ↔ _ at hf₁
-      rw [heq] at hf₁
-      simp at hf₁
-      exact hf₁
+--     have hi := h₁ i
+--     replace hi : f₁ ∘ i = id ↔ g₁ ∘ i = id := by
+--       rw [← Injective.left_cancellative_iff i i_inj]
+--       apply Iff.symm
+--       rw [← Injective.left_cancellative_iff i i_inj]
+--       dsimp
+--       exact Iff.symm hi
+--     exact hi
 
 
 
 
 
+--   have hf₂ := h₁ (f₂ ∘ r)
+--   have hg₂ := h₁ (g₂ ∘ r)
+--   have hf₁ := h₂ (r ∘ f₁)
+--   have hg₁ := h₂ (r ∘ g₁)
 
 
-theorem idk_imp_eq {X Y: Type u} {g₁ g₂: Y → X} : idk g₁ g₂ → g₁ = g₂ := by
-  intro h
-  funext y
-  dsimp [idk] at h
-  by_cases Nonempty (X → Y)
-  case neg h_mt =>
-    exfalso
-    exact h_mt ⟨fun _ => y⟩
-  case pos h_nmt =>
-    have := h (inv g₁ ∘ g₁ ∘ inv g₁)
-    change (inv g₁ ∘ ((g₁ ∘ inv g₁ ∘ g₁) ∘ inv g₁ ∘ g₁) ∘ inv g₁ = _) ↔ _ at this
-    rw [self_inv_self, self_inv_self] at this
-    simp at this
-    replace := congrFun this (g₁ y)
-    change (inv g₁ ∘ g₁ ∘ (inv g₁ ∘ g₂ ∘ inv g₁) ∘ (g₁ ∘ inv g₁ ∘ g₁)) y = _ at this
-    rw [self_inv_self] at this
+--   constructor
+--   . intro heq
+--     replace hf₂ : f₂ ∘ (r ∘ g₁ ∘ f₂ ∘ r) = f₂ ∘ r := by
+--       change f₂ ∘ (r ∘ (f₁ ∘ f₂) ∘ r) = _ ↔ _ at hf₂
+--       rw [heq] at hf₂
+--       simp at hf₂
+--       exact hf₂
+--     replace hf₁: (r ∘ f₁ ∘ g₂ ∘ r) ∘ f₁ = r ∘ f₁ := by
+--       change  (r ∘ (f₁ ∘ f₂) ∘ r) ∘ f₁ = r ∘ f₁ ↔ _ at hf₁
+--       rw [heq] at hf₁
+--       simp at hf₁
+--       exact hf₁
+
+
+
+
+
+
+
+-- theorem idk_imp_eq {X Y: Type u} {g₁ g₂: Y → X} : idk g₁ g₂ → g₁ = g₂ := by
+--   intro h
+--   funext y
+--   dsimp [idk] at h
+--   by_cases Nonempty (X → Y)
+--   case neg h_mt =>
+--     exfalso
+--     exact h_mt ⟨fun _ => y⟩
+--   case pos h_nmt =>
+--     have := h (inv g₁ ∘ g₁ ∘ inv g₁)
+--     change (inv g₁ ∘ ((g₁ ∘ inv g₁ ∘ g₁) ∘ inv g₁ ∘ g₁) ∘ inv g₁ = _) ↔ _ at this
+--     rw [self_inv_self, self_inv_self] at this
+--     simp at this
+--     replace := congrFun this (g₁ y)
+--     change (inv g₁ ∘ g₁ ∘ (inv g₁ ∘ g₂ ∘ inv g₁) ∘ (g₁ ∘ inv g₁ ∘ g₁)) y = _ at this
+--     rw [self_inv_self] at this
 
 
 

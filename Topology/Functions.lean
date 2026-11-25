@@ -24,6 +24,8 @@ noncomputable def inv {A: Type u} {B: Type v} (f: A → B) [inst: Nonempty (B �
   else
     Classical.choice inst b
 
+def IsPseudoInverse {A: Type u} {B: Type v} (f: A → B) (g: B → A): Prop := f ∘ g ∘ f = f
+
 @[simp]
 theorem inv_id {A: Type u} : inv (@id A) = id := by
   funext a
@@ -33,7 +35,7 @@ theorem inv_id {A: Type u} : inv (@id A) = id := by
   exact h.choose_spec
 
 @[simp]
-theorem self_inv_self {X: Type u} {Y: Type u} (f: X → Y) [Nonempty (Y → X)]: f ∘ inv f ∘ f = f := by
+theorem self_inv_self {X: Type u} {Y: Type v} (f: X → Y) [Nonempty (Y → X)]: f ∘ inv f ∘ f = f := by
   funext x
   unfold inv
   dsimp
@@ -41,11 +43,14 @@ theorem self_inv_self {X: Type u} {Y: Type u} (f: X → Y) [Nonempty (Y → X)]:
   rw [dif_pos this]
   exact this.choose_spec
 
-theorem exists_self_inv_self {X: Type u} {Y: Type u} (f: X → Y) [Nonempty (Y → X)]: ∃g, f ∘ g ∘ f = f := by
+theorem exists_self_inv_self {X: Type u} {Y: Type v} (f: X → Y) [Nonempty (Y → X)]: ∃g, f ∘ g ∘ f = f := by
   exists inv f
   exact self_inv_self f
 
-theorem exists_inv_self_inv {X: Type u} {Y: Type u} (f: X → Y) [Nonempty (Y → X)]: ∃g, g ∘ f ∘ g = g := by
+theorem exists_pseudoinverse {A: Type u} {B: Type v} (f: A → B) [inst: Nonempty (B → A)] : ∃g, IsPseudoInverse f g := exists_self_inv_self f
+
+
+theorem exists_inv_self_inv {X: Type u} {Y: Type v} (f: X → Y) [Nonempty (Y → X)]: ∃g, g ∘ f ∘ g = g := by
   exists inv f ∘ f ∘ inv f
   change inv f ∘ ((f ∘ inv f ∘ f) ∘ inv f ∘ f) ∘ inv f = _
   simp only [self_inv_self]
@@ -123,7 +128,7 @@ theorem nonempty_iff : Nonempty X → False ↔ (X → False) := by
 
 #print axioms nonempty_iff
 
-theorem exists_left_inv [inst: Nonempty (B → A)] (f_inj: Injective f): ∃h: B → A, h ∘ f = id := by
+theorem exists_left_inv [inst: Nonempty (B → A)] (f_inj: Injective f): ∃r: B → A, r ∘ f = id := by
   exists fun b => by
     by_cases b ∈ Set.full_image f
     case pos h => exact h.choose
@@ -136,7 +141,7 @@ theorem exists_left_inv [inst: Nonempty (B → A)] (f_inj: Injective f): ∃h: B
   apply f_inj.eq_of_ap_eq
   exact this.choose_spec
 
-theorem of_exists_left_inv {f: A → B} (h: B → A) (k: h ∘ f = id): Injective f where
+theorem of_exists_left_inv {f: A → B} (r: B → A) (k: r ∘ f = id): Injective f where
   eq_of_ap_eq a₁ a₂ heq := by
     rw [← id_eq a₁, ← id_eq a₂, ← k, Function.comp_apply, Function.comp_apply, heq]
 
@@ -192,7 +197,81 @@ theorem comp_inj_imp_right_inj (gof_inj: Injective (g ∘ f)) : Injective f wher
     have : (g ∘ f) a₁ = (g ∘ f) a₂ := congrArg g heq
     exact gof_inj.eq_of_ap_eq a₁ a₂ this
 
+theorem map_inj_of_inj {α β: Type} {F: Type → Type} [Functor F] [LawfulFunctor F]
+  (f: α → β) (f_inj: Injective f) [Nonempty (β → α)]: Injective (Functor.map f: F α → F β) := by
+  obtain ⟨h, hh⟩ := f_inj.exists_left_inv
+  apply of_exists_left_inv (Functor.map h)
+  funext x
+  dsimp
+  rw [← LawfulFunctor.comp_map, hh, LawfulFunctor.id_map]
+
+#print axioms map_inj_of_inj
 end Injective
+
+
+
+inductive What (T: Type) where
+  | nmt (hT: Nonempty T) (d: Option T): What T
+  | mt (hT: ¬Nonempty T) (b: Bool): What T
+
+
+noncomputable def What.map (f: α → β): What α → What β
+  | What.nmt hα d => What.nmt (by
+      obtain ⟨a⟩ := hα
+      exact ⟨f a⟩
+    ) (Option.map f d)
+  | What.mt hα b => open Classical in
+    if hβ: Nonempty β then
+      What.nmt hβ none
+    else
+      What.mt hβ b
+
+
+noncomputable instance : Functor What where
+  map := What.map
+
+instance: LawfulFunctor What where
+  id_map := by
+    intro α x
+    cases x
+    case nmt hα d =>
+      simp [Functor.map, What.map]
+    case mt hα b =>
+      simp [Functor.map, What.map, hα]
+  comp_map := by
+    intro α β γ g h x
+    cases x
+    case nmt hα d =>
+      simp [Functor.map, What.map]
+    case mt hα b =>
+      simp [Functor.map, What.map]
+      split <;> split <;> simp_all
+      case h_1 hγ xβ hβ dβ heq =>
+        subst heq
+        rfl
+      case h_1 hγ xβ hβ dβ heq =>
+        subst heq
+        apply hγ
+        obtain ⟨b⟩ := hβ
+        exact ⟨h b⟩
+  map_const := by
+    intro α β
+    funext x
+    simp [Functor.map, Functor.mapConst]
+
+theorem mt_to_unit_inj : Injective (Empty.elim : Empty → Unit) := by
+  constructor
+  exact Empty.rec
+
+theorem What.map_mt_to_unit_not_inj : ¬ Injective (What.map Empty.elim: What Empty → What Unit) := by
+  intro ⟨h⟩
+  have : ¬Nonempty Empty := by
+    intro ⟨e⟩
+    exact Empty.elim e
+  specialize h (What.mt this true) (What.mt this false)
+  have : Nonempty Unit := ⟨()⟩
+  simp [What.map, this] at h
+
 
 structure Surjective {A: Type u} {B: Type v} (f: A → B): Prop where intro ::
   exists_ap_eq (b: B): ∃a: A, f a = b
@@ -200,7 +279,7 @@ structure Surjective {A: Type u} {B: Type v} (f: A → B): Prop where intro ::
 
 namespace Surjective
 
-variable {A B C: Type u} (f: A → B) (g: B → C)
+variable {A: Type u} {B: Type v} {C: Type w} (f: A → B) (g: B → C)
 
 theorem id_surj : Surjective (@id A) where
   exists_ap_eq x := ⟨x, rfl⟩
@@ -269,7 +348,8 @@ theorem right_composition_injective (f_surj: Surjective f): Injective (fun h: B 
 theorem inv_right_inv {f: A → B} (f_surj: Surjective f): f ∘ @inv _ _ f (Surjective.imp_nonempty_inv f_surj) = id := by
   apply right_cancellative f f_surj
   have : Nonempty (B → A) := imp_nonempty_inv f_surj
-  exact self_inv_self f
+  change (f ∘ inv f ∘ f) = f
+  exact @self_inv_self _ _ f this
 
 noncomputable def ind {motive: B → Sort} {f: A → B} (f_surj: Surjective f) (k: (a: A) → motive (f a)) (b: B): motive b := by
   obtain ⟨a, ha⟩ := f_surj.exists_ap_eq b
@@ -348,6 +428,14 @@ theorem option_map_surj_of_surj (f_surj: Surjective f): Surjective (Option.map f
       obtain ⟨a, heq⟩ := f_surj.exists_ap_eq b
       subst heq
       exists some a
+
+theorem map_surj_of_surj {α β: Type u} {F: Type u → Type v} [Functor F] [LawfulFunctor F]
+  (f: α → β) (f_surj: Surjective f): Surjective (Functor.map f: F α → F β) := by
+  obtain ⟨h, hh⟩ := f_surj.exists_right_inv
+  apply of_exists_right_inv (Functor.map h)
+  funext x
+  dsimp
+  rw [← LawfulFunctor.comp_map, hh, LawfulFunctor.id_map]
 
 theorem comp_surj_imp_left_surj (gof_surj: Surjective (g ∘ f)): Surjective g := by
   apply Surjective.intro
@@ -464,6 +552,15 @@ theorem inv_comp {f: A → B} {g: B → C} [inst₁: Nonempty (B → A)] [inst�
   rfl
 
 theorem unique_self_inv_self {X Y: Type u} (f: X → Y) (f_bij: Bijective f) (g₁ g₂: Y → X) (hg₁: f ∘ g₁ ∘ f = f) (hg₂: f ∘ g₂ ∘ f = f): g₁ = g₂ := by
+  funext y
+  induction y using f_bij.ind
+  case h.k x =>
+  apply f_bij.eq_of_ap_eq
+  change (f ∘ g₁ ∘ f) x = (f ∘ g₂ ∘ f) x
+  rw [hg₁, hg₂]
+
+
+theorem unique_pseudoinverse {X Y: Type u} (f: X → Y) (f_bij: Bijective f) (g₁ g₂: Y → X) (hg₁: IsPseudoInverse f g₁) (hg₂: IsPseudoInverse f g₂): g₁ = g₂ := by
   funext y
   induction y using f_bij.ind
   case h.k x =>
@@ -657,6 +754,10 @@ theorem subtype_full_image_val : Set.full_image (@Subtype.val X fun x => x ∈ S
   simp [Set.ext_iff]
 
 @[simp]
+theorem subtype_full_image_val' : Set.full_image (@Subtype.val X p) = {elem := p} := by
+  simp [Set.ext_iff]
+
+@[simp]
 theorem forall_subtype {S: Set X} {p: S.subtype → Prop} : (∀x: Set.subtype S, p x) ↔ ∀x, ∀h: x ∈ S, p ⟨x,h⟩ where
   mp h x hx := h ⟨x, hx⟩
   mpr h x := h x.val x.property
@@ -717,7 +818,6 @@ theorem inv_uncurry {A B C: Type u}: @inv _ _ (@Function.uncurry A B C) ⟨Funct
   apply Injective.eq_of_ap_eq Function.uncurry_bij.toInjective
   dsimp
   exact h.choose_spec
-
 
 
 private theorem nonempty_bernstein_lemma {X Y: Type u} [Nonempty Y] (f: X → Y)

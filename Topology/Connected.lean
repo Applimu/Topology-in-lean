@@ -46,12 +46,18 @@ def is_connected {X: Type} (τ: Topology X) (S: Set X): Prop := Connected (τ.su
 def is_connected' {X: Type} (τ: Topology X) (S: Set X): Prop := ∀U₁, τ.is_open U₁ →
   ∀U₂, τ.is_closed U₂ → U₁ ∩ S = U₂ ∩ S → S ⊆ U₁ ∨ U₁ ∩ S = Set.empty
 
-theorem is_connected'_def {X: Type} (τ: Topology X) (S: Set X) : τ.is_connected S ↔ τ.is_connected' S := by
+-- @[simp]
+#check subtype_full_image_val
+
+section
+variable {X: Type} (τ: Topology X) (x y: X) (S: Set X)
+
+theorem is_connected'_def : τ.is_connected S ↔ τ.is_connected' S := by
   constructor
   · intro h U₁ U₁_open U₂ U₂_closed heq
     obtain ⟨h⟩ := h
     simp at h
-    replace h := h (Set.preimage Subtype.val U₁) U₁ U₁_open rfl U₂ U₂_closed ?_
+    replace h := h U₁ U₁_open U₂ U₂_closed ?_
     simp [← Set.eq_all_or_eq_empty_iff_all_or_empty] at h
     rw [subtype_full_image_val, Set.inter_comm] at h
     exact h
@@ -71,52 +77,78 @@ theorem is_connected'_def {X: Type} (τ: Topology X) (S: Set X) : τ.is_connecte
     obtain ⟨U', U'_closed, heq⟩ := U_closed
 
     simp [Set.preimage_eq_preimage_iff] at heq
-    have := h U U_open U' U'_closed heq
+    rw [subtype_full_image_val'] at heq
+    simp at heq
+    have := h U U_open U' U'_closed heq.symm
     apply Or.elim this <;> clear this
     · intro h
       apply Set.all_or_empty_of_eq_all
-      simp
+      simp [Set.full_image]
       exact h
     · intro h
       apply Set.all_or_empty_of_eq_empty
-      simp
-      rw [Set.inter_comm]
+      simp only [Set.preimage_eq_empty_iff]
+      rw [subtype_full_image_val, Set.inter_comm]
       exact h
 
 
 
-def ConnectedComponent {X: Type} (τ: Topology X) (x: X): Set X := Set.mk fun y =>
-  ∀U, τ.is_open U → τ.is_closed U → (x ∈ U ↔ y ∈ U)
+def ConnectedComponent : Set X := Set.mk fun y =>
+  ∀U, τ.is_open U → τ.is_closed U → x ∈ U → y ∈ U
 
 @[simp]
-theorem connected_component_def {X: Type} (τ: Topology X) (x y: X) : y ∈ τ.ConnectedComponent x ↔ ∀U, τ.is_open U → τ.is_closed U → (x ∈ U ↔ y ∈ U) := by
+theorem connected_component_def : y ∈ τ.ConnectedComponent x ↔ ∀U, τ.is_open U → τ.is_closed U → x ∈ U → y ∈ U := by
   simp [ConnectedComponent]
 
-theorem connected_component_open {X: Type} (τ: Topology X) (x: X) : τ.is_open $ τ.ConnectedComponent x := by
-  apply τ.open_of_open_cover_subsets'
-  intro y hy
-  simp at hy
+@[simp]
+theorem mem_connected_component_self : x ∈ τ.ConnectedComponent x := by
+  dsimp [ConnectedComponent]
+  intro U h_open h_closed
+  simp
 
-#check Subtype.val_inj
+theorem connected_component_eq_inter : τ.ConnectedComponent x = Set.set_inter (Set.mk fun V: Set X => x ∈ V ∧ τ.is_open V ∧ τ.is_closed V) := by
+  simp [Set.ext_iff]
+  intro y
+  constructor
+  · intro h U hx h_open h_closed
+    apply h <;> assumption
+  · intro h U h_open h_closed hx
+    apply h <;> assumption
 
-theorem ConnectedComponent_subtype_connected {X: Type} (τ: Topology X) (x: X): Connected (τ.subspace_topology (ConnectedComponent τ x)) := by
-  intro U U_open U_closed
-  simp_all
-  rcases U_open with ⟨Uo, Uo_open, heq⟩
-  subst heq
-  rcases U_closed with ⟨Uc, Uc_closed, heq⟩
-  simp [Set.preimage_eq_preimage_iff] at heq
+@[simp]
+theorem connected_component_closed : τ.is_closed (τ.ConnectedComponent x) := by
+  rw [connected_component_eq_inter]
+  refine closed_set_inter τ ?_
+  simp
 
-  by_cases Set.nonempty (Set.preimage (@Subtype.val X fun x' => x' ∈ τ.ConnectedComponent x) Uo)
-  case pos h =>
-    simp [h]
-    intro y hy
-    simp at hy
-    replace h₁ := hy Uo Uo_open
-    have : τ.is_open (Uo ∩ τ.ConnectedComponent x) := by
-      apply τ.open_inter _ Uo_open
-  case neg h =>
-    simp only [Set.not_nonempty_iff_eq_empty] at h
-    exact Set.all_or_empty_of_eq_empty _ h
+
+-- theorem ConnectedComponent_subtype_connected {X: Type} (τ: Topology X) (x: X): Connected (τ.subspace_topology (ConnectedComponent τ x)) := by
+--   rw [connected_def]
+--   intro U U_open U_closed
+--   simp_all
+--   rcases U_open with ⟨Uo, Uo_open, heq⟩
+--   subst heq
+--   rcases U_closed with ⟨Uc, Uc_closed, heq⟩
+--   simp [Set.preimage_eq_preimage_iff] at heq
+--   rw [subtype_full_image_val] at *
+
+--   by_cases Set.nonempty (Set.preimage (@Subtype.val X fun x' => x' ∈ τ.ConnectedComponent x) Uo)
+--   case neg h =>
+--     simp only [Set.not_nonempty_iff_eq_empty] at h
+--     exact Set.all_or_empty_of_eq_empty _ h
+--   case pos h =>
+--   simp [h]
+--   rw [subtype_full_image_val]
+--   obtain ⟨h₁, h₂⟩ : Uc ∩ τ.ConnectedComponent x ⊆ Uo ∩ τ.ConnectedComponent x ∧ Uo ∩ τ.ConnectedComponent x ⊆ Uc ∩ τ.ConnectedComponent x := by
+--     simp [heq]
+--   simp [Set.subset_inter_iff, Set.inter_subset_right, ] at h₁ h₂
+--   intro y hy
+--   simp at hy
+--   apply hy <;> try assumption
+--   · sorry
+--   ·
+
 
 end
+
+end Topology
